@@ -1,3 +1,4 @@
+use std::fmt::Formatter;
 use std::path::PathBuf;
 use reqwest::{Client, header};
 use tracing::{event, instrument, Level};
@@ -5,26 +6,32 @@ use url::Url;
 use phf::phf_map;
 use reqwest::header::HeaderMap;
 use chrono::Utc;
+use tokio::{time::Instant, fs::OpenOptions};
 
 
 use crate::errors::WscError;
+use crate::OnProgressCallbackFunction;
 use crate::session::Session;
 
 const DEFAULT_INDEX_FILE_NAME: &str = "index.html";
 const DEFAULT_SUB_PAGES_DIRECTORY_NAME: &str = "sub_pages";
 const DEFAULT_RESOURCES_DIRECTORY_NAME: &str = "static";
 
+#[derive(Debug)]
 pub enum ResourceType {
     Page,
     StaticFile
 }
 
+#[derive(Debug)]
 pub enum DownloadState {
     Queued,
     Downloading,
-    Paused
+    Paused,
+    Completed
 }
 
+#[derive(Debug)]
 pub struct Resource {
     pub link: String,
     pub destination: PathBuf,
@@ -44,7 +51,7 @@ impl Resource {
             Err(e) => {
                 event!(Level::ERROR, "Failed to fetch resource at {}", link.to_string());
                 event!(Level::ERROR, "{}", e);
-                return Err(WscError::ErrorDownloadingResource(e.to_string()))
+                return Err(WscError::ErrorFetchingResourceInfo(e.to_string()))
             }
         };
 
@@ -80,6 +87,22 @@ impl Resource {
             can_resume,
             content_length
         })
+    }
+
+    #[instrument]
+    pub async fn download(self: &Self, client: &Client, progress_update_interval: u64,
+                          on_progress_update: Box<dyn OnProgressCallbackFunction<u64>>) -> Result<(), WscError> {
+        let dest_file = match OpenOptions::new().create(true).append(true).write(true).open(&self.destination).await {
+            Err(e) => {
+                event!(Level::ERROR, "Failed to open the file {}", &self.destination.to_string_lossy());
+                event!(Level::ERROR, "{}", e);
+                return Err(WscError::FailedToOpenResourceFile(self.destination.to_string_lossy().to_string(), e.to_string()));
+            }
+            Ok(f) => f
+        };
+
+        let mut last_progress_time = Instant::now();
+        Ok(())
     }
 }
 
