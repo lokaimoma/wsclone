@@ -2,10 +2,11 @@ use chrono::Utc;
 use phf::phf_map;
 use reqwest::header::HeaderMap;
 use reqwest::{header, Client, StatusCode};
+use std::io::SeekFrom;
 
 use std::path::PathBuf;
 use std::time::Duration;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio::{fs::OpenOptions, time::Instant};
 use tracing::{event, instrument, Level};
 use url::Url;
@@ -144,6 +145,8 @@ impl Resource {
                     end = self.content_length
                 ),
             );
+        } else {
+            dest_file.seek(SeekFrom::Start(0)).await.unwrap();
         }
 
         let mut response = match request_build.send().await {
