@@ -145,8 +145,6 @@ impl Resource {
                     end = self.content_length
                 ),
             );
-        } else {
-            dest_file.seek(SeekFrom::Start(0)).await.unwrap();
         }
 
         let mut response = match request_build.send().await {
