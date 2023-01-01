@@ -2,7 +2,6 @@ use chrono::Utc;
 use phf::phf_map;
 use reqwest::header::HeaderMap;
 use reqwest::{header, Client, StatusCode};
-use std::fs;
 
 use lazy_static::lazy_static;
 use scraper::{Html, Selector};
@@ -10,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
-use tokio::{fs::OpenOptions, time::Instant};
+use tokio::{fs::{OpenOptions, read_to_string}, time::Instant};
 use tracing::{event, instrument, Level};
 use url::Url;
 
@@ -111,7 +110,7 @@ impl Resource {
     /// takes in a u64 value as attribute which equals the number of bytes written.
     pub async fn download(
         &mut self,
-        client: &Client,
+        client: Arc<Client>,
         progress_update_interval: Duration,
         on_progress_update: fn(u64) -> (),
     ) -> Result<(), WscError> {
@@ -229,7 +228,7 @@ impl Resource {
         let mut result: Vec<String> = Vec::new();
 
         if self.type_ == ResourceType::Page {
-            let html = match fs::read_to_string(&self.destination) {
+            let html = match read_to_string(&self.destination).await {
                 Ok(html) => html,
                 Err(e) => {
                     event!(
