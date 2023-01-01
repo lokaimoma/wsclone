@@ -1,6 +1,5 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-
 
 #[derive(Debug)]
 pub struct Session {
@@ -15,6 +14,5 @@ pub struct Session {
 }
 
 impl Session {
-    async fn relink_pages(){}
-    async fn relink_ressource_files(){}
+    async fn relink_resources(){}
 }

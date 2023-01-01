@@ -3,7 +3,9 @@ pub enum WscError {
     FailedToConnectToServer(String),
     ErrorDownloadingResource(String),
     ErrorFetchingResourceInfo(String),
-    /// File name, Reason
+    ErrorParsingIndexUrl(String),
+    /// File path, Reason
     FailedToOpenResourceFile(String, String),
     ErrorWritingToFile(String, String),
+    ErrorReadingHtmlFile(String, String),
 }

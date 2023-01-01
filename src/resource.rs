@@ -2,23 +2,33 @@ use chrono::Utc;
 use phf::phf_map;
 use reqwest::header::HeaderMap;
 use reqwest::{header, Client, StatusCode};
-use std::io::SeekFrom;
+use std::fs;
 
+use lazy_static::lazy_static;
+use scraper::{Html, Selector};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use tokio::{fs::OpenOptions, time::Instant};
 use tracing::{event, instrument, Level};
 use url::Url;
 
 use crate::errors::WscError;
+use crate::link::get_full_link;
 use crate::session::Session;
 
 const DEFAULT_INDEX_FILE_NAME: &str = "index.html";
 const DEFAULT_SUB_PAGES_DIRECTORY_NAME: &str = "sub_pages";
 const DEFAULT_RESOURCES_DIRECTORY_NAME: &str = "static";
+lazy_static! {
+    static ref CSS_TAG_SELECTOR: Selector =
+        Selector::parse(r#"link[href][rel="stylesheet"]"#).unwrap();
+    static ref JS_TAG_SELECTOR: Selector = Selector::parse("script[src]").unwrap();
+    static ref ANCHOR_TAG_SELECTOR: Selector = Selector::parse("a[href]:not([download])").unwrap();
+}
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ResourceType {
     Page,
     StaticFile,
@@ -34,7 +44,7 @@ pub enum DownloadState {
 
 #[derive(Debug)]
 pub struct Resource {
-    pub link: String,
+    pub link: Url,
     pub destination: PathBuf,
     pub type_: ResourceType,
     pub content_length: u64,
@@ -45,13 +55,13 @@ pub struct Resource {
 
 impl Resource {
     #[instrument]
-    pub async fn new(link: Url, session: &Session, client: &Client) -> Result<Self, WscError> {
+    pub async fn new(link: Url, session: &Session, client: Arc<Client>) -> Result<Self, WscError> {
         let response = match client.head(link.to_string()).send().await {
             Ok(r) => r,
             Err(e) => {
                 event!(
                     Level::ERROR,
-                    "Failed to fetch resource at {}",
+                    "Failed to fetch resource info from {}",
                     link.to_string()
                 );
                 event!(Level::ERROR, "{}", e);
@@ -86,9 +96,9 @@ impl Resource {
         };
 
         Ok(Self {
-            link: link.to_string(),
             bytes_written: 0,
             state: DownloadState::Queued,
+            link,
             type_,
             destination,
             can_resume,
@@ -173,6 +183,7 @@ impl Resource {
                 return Err(WscError::ErrorDownloadingResource(e.to_string()));
             }
         };
+        self.state = DownloadState::Downloading;
         let mut bytes_written = 0;
         let mut last_progress_time = Instant::now() - progress_update_interval;
         while let Some(chunk) = match response.chunk().await {
@@ -208,7 +219,54 @@ impl Resource {
             };
         }
 
+        self.state = DownloadState::Completed;
+
         Ok(())
+    }
+
+    #[instrument]
+    pub async fn get_resource_links(&self) -> Result<Vec<String>, WscError> {
+        let mut result: Vec<String> = Vec::new();
+
+        if self.type_ == ResourceType::Page {
+            let html = match fs::read_to_string(&self.destination) {
+                Ok(html) => html,
+                Err(e) => {
+                    event!(
+                        Level::ERROR,
+                        "Failed to read html file: {}",
+                        self.destination.to_string_lossy().to_string()
+                    );
+                    event!(Level::ERROR, "{}", e);
+                    return Err(WscError::ErrorReadingHtmlFile(
+                        self.destination.to_string_lossy().to_string(),
+                        e.to_string(),
+                    ));
+                }
+            };
+            let html_document = Html::parse_document(&html);
+            let css_elements = html_document.select(&CSS_TAG_SELECTOR);
+            let script_elements = html_document.select(&JS_TAG_SELECTOR);
+            let anchor_elements = html_document.select(&ANCHOR_TAG_SELECTOR);
+
+            css_elements
+                .chain(script_elements)
+                .chain(anchor_elements)
+                .into_iter()
+                .for_each(|element| {
+                    if let Some(href) = element.value().attr("href") {
+                        if let Some(link) = get_full_link(href, &self.link) {
+                            result.push(link);
+                        };
+                    }else if let Some(src) = element.value().attr("src") {
+                        if let Some(link) = get_full_link(src, &self.link) {
+                            result.push(link)
+                        }
+                    }
+                })
+        }
+
+        Ok(result)
     }
 }
 
