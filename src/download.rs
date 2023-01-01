@@ -1,9 +1,9 @@
 use crate::errors::WscError;
 use crate::resource::Resource;
 use crate::session::Session;
+use futures::TryFutureExt;
 use reqwest::Client;
 use std::sync::Arc;
-use futures::TryFutureExt;
 use tokio::time::Duration;
 use tracing::{event, instrument, Level};
 use url::Url;
@@ -15,6 +15,9 @@ pub struct DownloadRule {
     pub should_download_resource_with_unknown_size: bool,
     /// Progress update interval in millisecond
     pub progress_update_interval: u64,
+    /// Max levels of pages to download. Default is 1, which means will download the initial page
+    /// and all the links to other pages it finds on the initial page then it stops.
+    pub max_level: u8,
 }
 
 #[instrument]
@@ -37,13 +40,23 @@ pub async fn init_session_download(session: &Session, rule: DownloadRule) -> Res
         .download(
             client.clone(),
             Duration::from_millis(rule.progress_update_interval),
-            |bytes_written| {},
+            |_| {},
         )
         .await?;
-    let res_links = index_page.get_resource_links().and_then(|links| async {
-        res_links_to_resources(links, &rule, session, client.clone()).await
-    }).await?;
-
+    let res_links = index_page
+        .get_resource_links()
+        .and_then(|links| async {
+            res_links_to_resources(links, &rule, session, client.clone()).await
+        })
+        .await?;
+    for mut res in res_links {
+        res.download(
+            client.clone(),
+            Duration::from_millis(rule.progress_update_interval),
+            |_| {},
+        )
+        .await?;
+    }
     Ok(())
 }
 
