@@ -13,6 +13,14 @@ pub struct Session {
     pub processed_resource_links: HashMap<String, String>,
 }
 
+pub struct SessionUpdate {
+    pub session_url: String,
+    pub resource_url: String,
+    pub message: Option<String>,
+    pub bytes_written: Option<u64>,
+    pub total_size: u64
+}
+
 impl Session {
     async fn relink_resources(){}
 }
