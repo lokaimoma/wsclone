@@ -5,7 +5,7 @@ use libwsclone::session::Session;
 async fn main() {
     let format = tracing_subscriber::fmt::format().pretty();
     tracing_subscriber::fmt()
-        .with_env_filter("libwsclone=debug")
+        .with_env_filter("libwsclone=warn")
         .event_format(format)
         .init();
     let mut session = Session {

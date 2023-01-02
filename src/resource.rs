@@ -64,7 +64,22 @@ impl Resource {
     pub async fn new(link: Url, session: &Session, client: Arc<Client>) -> Result<Self, WscError> {
         event!(Level::DEBUG, "[Querying resource info] => {}", link);
         let response = match client.head(link.to_string()).send().await {
-            Ok(r) => r,
+            Ok(r) => {
+                if r.status().is_server_error() || r.status().is_client_error() {
+                    event!(
+                        Level::ERROR,
+                        "Failed to fetch resource info from {}, status code : {}",
+                        link,
+                        r.status()
+                    );
+                    return Err(WscError::ErrorFetchingResourceInfo(format!(
+                        "Failed to fetch resource info from {}, status code : {}",
+                        link,
+                        r.status()
+                    )));
+                }
+                r
+            }
             Err(e) => {
                 event!(
                     Level::ERROR,
@@ -285,6 +300,7 @@ impl Resource {
 
 #[instrument]
 fn get_file_name(mut link: &str, response_header: &HeaderMap) -> String {
+    let original_link = link.to_owned();
     event!(Level::DEBUG, "Getting file name for {}", link);
     if link.contains('?') {
         if let Some(idx) = link.rfind('?') {
@@ -299,11 +315,25 @@ fn get_file_name(mut link: &str, response_header: &HeaderMap) -> String {
             let mut val = value.to_str().unwrap();
             // Removing charset if present (Eg. text/html; charset=utf-8)
             if val.contains(';') {
-                val = &val[val.find(';').unwrap()..val.len()];
+                val = &val[0..val.find(';').unwrap()];
             }
-            MIME_TYPES.get(val).unwrap_or(&"").to_owned()
+            MIME_TYPES
+                .get(val)
+                .unwrap_or_else(|| {
+                    event!(
+                        Level::WARN,
+                        "Content-Type: |{}| didn't much any of the mime types. For {}",
+                        val,
+                        &original_link
+                    );
+                    &""
+                })
+                .to_owned()
         }
-        None => "",
+        None => {
+            event!(Level::WARN, "No content type found for {}", &original_link);
+            ""
+        }
     };
 
     if !link.is_empty() && !extension.is_empty() {
@@ -325,14 +355,36 @@ fn get_file_name(mut link: &str, response_header: &HeaderMap) -> String {
         };
     } else if !link.is_empty() && link.contains('.') && link.len() > 1 {
         return link.to_string();
+    } else if !extension.is_empty() {
+        return if extension == ".html" {
+            format!(
+                "page-{time}{ext}",
+                time = Utc::now().timestamp(),
+                ext = extension
+            )
+        } else {
+            format!(
+                "static-{time}{ext}",
+                time = Utc::now().timestamp(),
+                ext = extension
+            )
+        };
     }
 
     return match response_header.get(header::CONTENT_DISPOSITION) {
-        None => format!(
-            "file-{time}{ext}",
-            time = Utc::now().timestamp(),
-            ext = extension
-        ),
+        None => {
+            event!(
+                Level::WARN,
+                "Failed to get file name for {}. File name: {}. Using generic name.",
+                link,
+                &original_link
+            );
+            format!(
+                "file-{time}{ext}",
+                time = Utc::now().timestamp(),
+                ext = extension
+            )
+        }
         Some(value) => {
             let mut value = value.to_str().unwrap_or("");
             let mut file_name: String;
@@ -349,6 +401,12 @@ fn get_file_name(mut link: &str, response_header: &HeaderMap) -> String {
                 file_name = value.replace("filename=", "");
                 file_name = file_name.replacen('\"', "", 2);
             } else {
+                event!(
+                    Level::WARN,
+                    "Failed to get file name for {}. File name: {}. Using generic name.",
+                    link,
+                    &original_link
+                );
                 file_name = format!(
                     "file-{time}{ext}",
                     time = Utc::now().timestamp(),
@@ -418,14 +476,34 @@ mod test_get_file_name {
     }
 
     #[test]
-    fn get_file_name_from_content_disposition() {
-        let link: &str = "http://somelink.com/sdfsdf";
-        let file_name: &str = "hello.js";
+    fn get_file_name_no_name_in_url() {
+        let link: &str = "http://somelink.com/";
         let mut header_map = header::HeaderMap::new();
         header_map.insert(
             header::CONTENT_TYPE,
             "text/javascript; charset=utf-8".parse().unwrap(),
         );
+
+        assert!(get_file_name(link, &header_map).contains("static"));
+    }
+
+    #[test]
+    fn get_file_name_no_name_in_url_2() {
+        let link: &str = "http://somelink.com/";
+        let mut header_map = header::HeaderMap::new();
+        header_map.insert(
+            header::CONTENT_TYPE,
+            "text/html; charset=utf-8".parse().unwrap(),
+        );
+
+        assert!(get_file_name(link, &header_map).contains("page"));
+    }
+
+    #[test]
+    fn get_file_name_from_content_disposition() {
+        let link: &str = "http://somelink.com/";
+        let file_name: &str = "hello.js";
+        let mut header_map = header::HeaderMap::new();
         header_map.insert(
             header::CONTENT_DISPOSITION,
             r#"attachment; filename="hello.js""#.parse().unwrap(),
@@ -436,13 +514,9 @@ mod test_get_file_name {
 
     #[test]
     fn get_file_name_from_content_disposition_filename_rfc_5987_style() {
-        let link: &str = "http://somelink.com/sdfsdf";
+        let link: &str = "http://somelink.com/";
         let file_name: &str = "hello.js";
         let mut header_map = header::HeaderMap::new();
-        header_map.insert(
-            header::CONTENT_TYPE,
-            "text/javascript; charset=utf-8".parse().unwrap(),
-        );
         header_map.insert(
             header::CONTENT_DISPOSITION,
             r#"attachment; filename="hello.js"; filename*=UTF-8'en'hello.js"#
