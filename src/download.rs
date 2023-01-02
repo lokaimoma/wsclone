@@ -4,6 +4,7 @@ use crate::session::Session;
 use futures::TryFutureExt;
 use reqwest::Client;
 use std::sync::Arc;
+
 use tokio::time::Duration;
 use tracing::{event, instrument, Level};
 use url::Url;
@@ -21,7 +22,10 @@ pub struct DownloadRule {
 }
 
 #[instrument]
-pub async fn init_session_download(session: &Session, rule: DownloadRule) -> Result<(), WscError> {
+pub async fn init_session_download(
+    session: &mut Session,
+    rule: DownloadRule,
+) -> Result<(), WscError> {
     let index_url: Url = match Url::parse(&session.index_url) {
         Ok(u) => u,
         Err(e) => {
@@ -50,30 +54,46 @@ pub async fn init_session_download(session: &Session, rule: DownloadRule) -> Res
         })
         .await?;
     for mut res in res_links {
-        res.download(
-            client.clone(),
-            Duration::from_millis(rule.progress_update_interval),
-            |_| {},
-        )
-        .await?;
+        if (res
+            .download(
+                client.clone(),
+                Duration::from_millis(rule.progress_update_interval),
+                |_| {},
+            )
+            .await)
+            .is_err()
+        {};
     }
     Ok(())
 }
 
+#[instrument]
 async fn res_links_to_resources(
     res_links: Vec<String>,
     rule: &DownloadRule,
-    session: &Session,
+    session: &mut Session,
     client: Arc<Client>,
 ) -> Result<Vec<Resource>, WscError> {
+    event!(Level::DEBUG, "Total links received {}", res_links.len());
     let mut resources: Vec<Resource> = Vec::new();
     for link in res_links {
-        let res = Resource::new(Url::parse(&link).unwrap(), session, client.clone()).await?;
+        if link.contains('#') {
+            continue;
+        }
+        let res = match Resource::new(Url::parse(&link).unwrap(), session, client.clone()).await {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
         if (res.content_length != 0 && res.content_length < rule.max_static_resource_download_size)
             || (res.content_length == 0 && rule.should_download_resource_with_unknown_size)
         {
             resources.push(res);
         }
     }
+    event!(
+        Level::DEBUG,
+        "Total links processed for download {}",
+        resources.len()
+    );
     Ok(resources)
 }

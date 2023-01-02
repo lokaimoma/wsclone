@@ -1,15 +1,19 @@
 use chrono::Utc;
 use phf::phf_map;
 use reqwest::header::HeaderMap;
-use reqwest::{header, Client, StatusCode};
+use reqwest::{header, Client};
+use std::io::SeekFrom;
 
 use lazy_static::lazy_static;
 use scraper::{Html, Selector};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::AsyncWriteExt;
-use tokio::{fs::{OpenOptions, read_to_string}, time::Instant};
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+use tokio::{
+    fs::{read_to_string, OpenOptions},
+    time::Instant,
+};
 use tracing::{event, instrument, Level};
 use url::Url;
 
@@ -24,7 +28,10 @@ lazy_static! {
     static ref CSS_TAG_SELECTOR: Selector =
         Selector::parse(r#"link[href][rel="stylesheet"]"#).unwrap();
     static ref JS_TAG_SELECTOR: Selector = Selector::parse("script[src]").unwrap();
-    static ref ANCHOR_TAG_SELECTOR: Selector = Selector::parse("a[href]:not([download])").unwrap();
+    static ref ANCHOR_TAG_SELECTOR: Selector = Selector::parse(
+        r##"a[href]:not([download]):not([href="javascript:void(0)"]):not([href~="#"])"##
+    )
+    .unwrap();
 }
 
 #[derive(Debug, PartialEq)]
@@ -55,6 +62,7 @@ pub struct Resource {
 impl Resource {
     #[instrument]
     pub async fn new(link: Url, session: &Session, client: Arc<Client>) -> Result<Self, WscError> {
+        event!(Level::DEBUG, "[Querying resource info] => {}", link);
         let response = match client.head(link.to_string()).send().await {
             Ok(r) => r,
             Err(e) => {
@@ -93,6 +101,11 @@ impl Resource {
             }
             destination.push(file_name)
         };
+        event!(
+            Level::DEBUG,
+            "Location for resource = {}",
+            destination.to_string_lossy()
+        );
 
         Ok(Self {
             bytes_written: 0,
@@ -117,17 +130,16 @@ impl Resource {
         let mut dest_file = match OpenOptions::new()
             .create(true)
             .append(true)
-            .truncate(self.content_length == 0 || !self.can_resume)
-            .open(&self.destination)
+            .open(self.destination.as_path())
             .await
         {
             Err(e) => {
                 event!(
                     Level::ERROR,
-                    "Failed to open the file {}",
-                    &self.destination.to_string_lossy()
+                    "Failed to open the file {:?}",
+                    &self.destination
                 );
-                event!(Level::ERROR, "{}", e);
+                event!(Level::ERROR, "{} | {}", e, e.kind());
                 return Err(WscError::FailedToOpenResourceFile(
                     self.destination.to_string_lossy().to_string(),
                     e.to_string(),
@@ -154,16 +166,17 @@ impl Resource {
                     end = self.content_length
                 ),
             );
+        } else {
+            dest_file.seek(SeekFrom::Start(0)).await.unwrap();
         }
 
         let mut response = match request_build.send().await {
             Ok(response) => {
-                if response.status() != StatusCode::OK
-                    || response.status() != StatusCode::PARTIAL_CONTENT
-                {
+                if !response.status().is_success() {
                     event!(
                         Level::ERROR,
-                        "Got an error page whiles fetching {}",
+                        "Got status code {} whiles fetching {}",
+                        response.status(),
                         self.link
                     );
                     return Err(WscError::ErrorDownloadingResource(
@@ -182,6 +195,7 @@ impl Resource {
                 return Err(WscError::ErrorDownloadingResource(e.to_string()));
             }
         };
+        event!(Level::DEBUG, "Downloading {}", self.link);
         self.state = DownloadState::Downloading;
         let mut bytes_written = 0;
         let mut last_progress_time = Instant::now() - progress_update_interval;
@@ -219,7 +233,7 @@ impl Resource {
         }
 
         self.state = DownloadState::Completed;
-
+        event!(Level::DEBUG, "Download Completed for {}", self.link);
         Ok(())
     }
 
@@ -257,7 +271,7 @@ impl Resource {
                         if let Some(link) = get_full_link(href, &self.link) {
                             result.push(link);
                         };
-                    }else if let Some(src) = element.value().attr("src") {
+                    } else if let Some(src) = element.value().attr("src") {
                         if let Some(link) = get_full_link(src, &self.link) {
                             result.push(link)
                         }
@@ -269,20 +283,26 @@ impl Resource {
     }
 }
 
+#[instrument]
 fn get_file_name(mut link: &str, response_header: &HeaderMap) -> String {
+    event!(Level::DEBUG, "Getting file name for {}", link);
     if link.contains('?') {
         if let Some(idx) = link.rfind('?') {
             link = &link[0..idx];
         }
     }
     if let Some(idx) = link.rfind('/') {
-        link = &link[idx..link.len()];
+        link = &link[idx + 1..link.len()];
     }
     let extension = match response_header.get(header::CONTENT_TYPE) {
-        Some(value) => MIME_TYPES
-            .get(value.to_str().unwrap())
-            .unwrap_or(&"")
-            .to_owned(),
+        Some(value) => {
+            let mut val = value.to_str().unwrap();
+            // Removing charset if present (Eg. text/html; charset=utf-8)
+            if val.contains(';') {
+                val = &val[val.find(';').unwrap()..val.len()];
+            }
+            MIME_TYPES.get(val).unwrap_or(&"").to_owned()
+        }
         None => "",
     };
 
@@ -303,6 +323,8 @@ fn get_file_name(mut link: &str, response_header: &HeaderMap) -> String {
                 ext = extension
             )
         };
+    } else if !link.is_empty() && link.contains('.') && link.len() > 1 {
+        return link.to_string();
     }
 
     return match response_header.get(header::CONTENT_DISPOSITION) {
@@ -357,3 +379,77 @@ static MIME_TYPES: phf::Map<&'static str, &str> = phf_map! {
     "image/gif" => ".gif",
     "application/javascript" => ".js"
 };
+
+#[cfg(test)]
+mod test_get_file_name {
+    use super::get_file_name;
+    use reqwest::header;
+
+    #[test]
+    fn get_file_name_from_url() {
+        let link: &str = "http://somelink.com/hello.js?skdjs=324&skdsjk=skfj";
+        let file_name: &str = "hello.js";
+        let mut header_map = header::HeaderMap::new();
+        header_map.insert(
+            header::CONTENT_TYPE,
+            "text/javascript; charset=utf-8".parse().unwrap(),
+        );
+
+        assert_eq!(get_file_name(link, &header_map), file_name);
+    }
+
+    #[test]
+    fn get_file_name_from_url_no_charset() {
+        let link: &str = "http://somelink.com/hello.js?skdjs=324&skdsjk=skfj";
+        let file_name: &str = "hello.js";
+        let mut header_map = header::HeaderMap::new();
+        header_map.insert(header::CONTENT_TYPE, "text/javascript;".parse().unwrap());
+
+        assert_eq!(get_file_name(link, &header_map), file_name);
+    }
+
+    #[test]
+    fn get_file_name_from_url_no_content_type() {
+        let link: &str = "http://somelink.com/hello.js?skdjs=324&skdsjk=skfj";
+        let file_name: &str = "hello.js";
+        let header_map = header::HeaderMap::new();
+
+        assert_eq!(get_file_name(link, &header_map), file_name);
+    }
+
+    #[test]
+    fn get_file_name_from_content_disposition() {
+        let link: &str = "http://somelink.com/sdfsdf";
+        let file_name: &str = "hello.js";
+        let mut header_map = header::HeaderMap::new();
+        header_map.insert(
+            header::CONTENT_TYPE,
+            "text/javascript; charset=utf-8".parse().unwrap(),
+        );
+        header_map.insert(
+            header::CONTENT_DISPOSITION,
+            r#"attachment; filename="hello.js""#.parse().unwrap(),
+        );
+
+        assert_eq!(get_file_name(link, &header_map), file_name);
+    }
+
+    #[test]
+    fn get_file_name_from_content_disposition_filename_rfc_5987_style() {
+        let link: &str = "http://somelink.com/sdfsdf";
+        let file_name: &str = "hello.js";
+        let mut header_map = header::HeaderMap::new();
+        header_map.insert(
+            header::CONTENT_TYPE,
+            "text/javascript; charset=utf-8".parse().unwrap(),
+        );
+        header_map.insert(
+            header::CONTENT_DISPOSITION,
+            r#"attachment; filename="hello.js"; filename*=UTF-8'en'hello.js"#
+                .parse()
+                .unwrap(),
+        );
+
+        assert_eq!(get_file_name(link, &header_map), file_name);
+    }
+}

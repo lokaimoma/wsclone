@@ -1,7 +1,7 @@
 use std::fmt::Formatter;
 
-mod download;
-mod errors;
+pub mod download;
+pub mod errors;
 mod link;
 mod resource;
-mod session;
+pub mod session;
