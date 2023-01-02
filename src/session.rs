@@ -1,3 +1,4 @@
+use crate::resource::Resource;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -7,10 +8,7 @@ pub struct Session {
     pub index_url: String,
     /// The destination for the downloaded files. This path must exist.
     pub destination_directory: String,
-    /// A page url to file path map of the pages we've downloaded
-    pub processed_pages: HashMap<String, String>,
-    /// A resource link to file path map of the resources we've downloaded
-    pub processed_resource_links: HashMap<String, String>,
+    pub resources: HashMap<String, Resource>,
 }
 
 pub struct SessionUpdate {
