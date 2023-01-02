@@ -5,6 +5,7 @@ pub enum WscError {
     ErrorDownloadingResource(String),
     ErrorFetchingResourceInfo(String),
     ErrorParsingIndexUrl(String),
+    ErrorCreatingDestinationDirectory(String),
     /// Parameter is path to directory
     DestinationDirectoryDoesNotExist(String),
     /// parameters are file path, additional error message

@@ -27,6 +27,7 @@ pub async fn download_file<F>(
     client: &Client,
     rule: &DownloadRule,
     on_update: fn(Update) -> F,
+    file_name: Option<String>
 ) -> Result<Option<String>, WscError>
 where
     F: Future<Output = ()>,
@@ -61,22 +62,26 @@ where
     };
 
     let headers = response.headers();
-
-    let f_ext = get_file_extension(&dld_item, headers);
-    tracing::debug!(
+    let f_name: String;
+    if file_name.is_none() {
+        let f_ext = get_file_extension(&dld_item, headers);
+        tracing::debug!(
         "File extension for {} is {}",
         dld_item.link.to_string(),
         f_ext
     );
 
-    let file_name: String = get_file_name(&dld_item, headers, f_ext);
-    tracing::debug!(
+        f_name = get_file_name(&dld_item, headers, f_ext);
+        tracing::debug!(
         "File name for {} is {}",
         dld_item.link.to_string(),
-        &file_name
+        &f_name
     );
+    }else {
+        f_name = file_name.unwrap();
+    }
 
-    dld_item.destination_dir.push(&file_name);
+    dld_item.destination_dir.push(&f_name);
 
     let mut dest_file = match OpenOptions::new()
         .create_new(true)
@@ -91,7 +96,7 @@ where
             tracing::error!("{}", e);
             on_update(MessageUpdate(Message {
                 session_id,
-                resource_name: file_name,
+                resource_name: f_name,
                 is_error: true,
                 content: "Error opening destination file".into(),
             }))
@@ -120,7 +125,7 @@ where
             );
             on_update(MessageUpdate(Message {
                 session_id,
-                resource_name: file_name,
+                resource_name: f_name,
                 is_error: true,
                 content: "Network error".into(),
             }))
@@ -138,7 +143,7 @@ where
             tracing::error!("{} | {}", e, e.kind());
             on_update(MessageUpdate(Message {
                 session_id,
-                resource_name: file_name,
+                resource_name: f_name,
                 is_error: true,
                 content: "Error writing to file".into(),
             }))
@@ -153,7 +158,7 @@ where
             (on_update)(ProgressUpdate(Progress {
                 bytes_written: bytes_written as u64,
                 file_size: f_size,
-                resource_name: file_name.to_owned(),
+                resource_name: f_name.to_owned(),
                 session_id: session_id.to_owned(),
             }))
             .await;
@@ -161,6 +166,11 @@ where
         }
     }
     // destination_dir has been updated previously to point to the destination file
+    tracing::debug!(
+        "Download completed for {}, file @ {}",
+        &dld_item.link,
+        dld_item.destination_dir.to_str().unwrap()
+    );
     Ok(Some(dld_item.destination_dir.to_string_lossy().to_string()))
 }
 

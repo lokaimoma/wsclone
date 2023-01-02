@@ -1,6 +1,11 @@
+use crate::download::{download_file, DownloadItem};
 use crate::errors::WscError;
+use crate::session::Session;
 use std::future::Future;
+use std::path::PathBuf;
+use tokio::fs;
 use tracing::instrument;
+use url::Url;
 
 mod download;
 mod errors;
@@ -55,5 +60,30 @@ pub async fn init_download<F>(
 where
     F: Future<Output = ()>,
 {
+    let mut session = Session {
+        session_id: session_id.to_string(),
+        processed_static_files: Default::default(),
+        processed_pages: Default::default(),
+    };
+    if let Err(e) = fs::create_dir_all(dest_dir).await {
+        tracing::error!("Failed to create destination directory");
+        tracing::error!("{}", e);
+        return Err(WscError::ErrorCreatingDestinationDirectory(e.to_string()));
+    };
+    let client = reqwest::Client::new();
+    let idx_f_loc = download_file(
+        session_id.to_string(),
+        DownloadItem {
+            link: Url::parse(link).unwrap(),
+            destination_dir: PathBuf::from(dest_dir),
+        },
+        &client,
+        &rule,
+        on_update,
+        Some("index.html".into()),
+    )
+    .await?
+    .unwrap();
+    session.processed_pages.insert(link.to_string(), idx_f_loc);
     Ok(())
 }
