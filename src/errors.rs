@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum WscError {
     ResourceAlreadyRegistered,
     FailedToConnectToServer(String),
@@ -7,10 +7,9 @@ pub enum WscError {
     ErrorParsingIndexUrl(String),
     ErrorCreatingDestinationDirectory(String),
     InvalidHtml,
+    UnknownError(String),
     /// Parameter is path to directory
     DestinationDirectoryDoesNotExist(String),
     /// parameters are file path, additional error message
-    FailedToOpenResourceFile(String, String),
-    ErrorWritingToFile(String, String),
-    ErrorReadingHtmlFile(String, String),
+    FileOperationError(String, String),
 }

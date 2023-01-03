@@ -7,6 +7,7 @@ use reqwest::header::HeaderMap;
 use reqwest::{header, Client};
 use std::future::Future;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
@@ -24,13 +25,13 @@ pub struct DownloadItem {
 pub async fn download_file<F>(
     session_id: String,
     mut dld_item: DownloadItem,
-    client: &Client,
+    client: &Arc<Client>,
     rule: &DownloadRule,
     on_update: fn(Update) -> F,
-    file_name: Option<String>
+    file_name: Option<String>,
 ) -> Result<Option<String>, WscError>
 where
-    F: Future<Output = ()>,
+    F: Future + Send + 'static,
 {
     if rule.black_list_urls.contains(&dld_item.link.to_string()) {
         return Ok(None);
@@ -66,18 +67,14 @@ where
     if file_name.is_none() {
         let f_ext = get_file_extension(&dld_item, headers);
         tracing::debug!(
-        "File extension for {} is {}",
-        dld_item.link.to_string(),
-        f_ext
-    );
+            "File extension for {} is {}",
+            dld_item.link.to_string(),
+            f_ext
+        );
 
         f_name = get_file_name(&dld_item, headers, f_ext);
-        tracing::debug!(
-        "File name for {} is {}",
-        dld_item.link.to_string(),
-        &f_name
-    );
-    }else {
+        tracing::debug!("File name for {} is {}", dld_item.link.to_string(), &f_name);
+    } else {
         f_name = file_name.unwrap();
     }
 
@@ -113,6 +110,10 @@ where
         None => 0u64,
         Some(s) => s.to_str().unwrap().parse::<u64>().unwrap_or(0u64),
     };
+
+    if f_size > rule.max_static_file_size {
+        return Ok(None);
+    }
 
     let progress_update_interval = Duration::from_millis(rule.progress_update_interval);
     let mut last_update_time = Instant::now() - progress_update_interval;
