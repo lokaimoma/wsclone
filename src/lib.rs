@@ -71,7 +71,7 @@ where
         return Err(WscError::ErrorCreatingDestinationDirectory(e.to_string()));
     };
     let client = reqwest::Client::new();
-    let idx_f_loc = download_file(
+    let index_file_path = download_file(
         session_id.to_string(),
         DownloadItem {
             link: Url::parse(link).unwrap(),
@@ -84,6 +84,6 @@ where
     )
     .await?
     .unwrap();
-    session.processed_pages.insert(link.to_string(), idx_f_loc);
+    session.processed_pages.insert(link.to_string(), index_file_path);
     Ok(())
 }
