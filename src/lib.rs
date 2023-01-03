@@ -24,7 +24,6 @@ pub struct DownloadRule {
     /// only the initial page and it's resources.
     pub max_level: u8,
     pub black_list_urls: Vec<String>,
-    pub allowed_file_extensions: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -84,6 +83,8 @@ where
     )
     .await?
     .unwrap();
-    session.processed_pages.insert(link.to_string(), index_file_path);
+    session
+        .processed_pages
+        .insert(link.to_string(), index_file_path);
     Ok(())
 }

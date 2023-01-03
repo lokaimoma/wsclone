@@ -1,12 +1,11 @@
 use crate::errors::WscError;
-use futures::FutureExt;
 use scraper::{Html, Selector};
 use tracing::{event, instrument, Level};
 use url::{ParseError, Url};
 
 #[instrument]
 /// Get the full link to a sub-page or file, given a page's full url.
-pub fn get_full_link(link: &str, page_url: &Url) -> Option<String> {
+fn get_full_link(link: &str, page_url: &Url) -> Option<String> {
     if link.is_empty() {
         return None;
     }
@@ -27,16 +26,36 @@ pub fn get_full_link(link: &str, page_url: &Url) -> Option<String> {
     }
 }
 
-#[tracing::instrument]
-pub fn get_anchor_links(html_string: &str, page_url: Url) -> Result<Vec<Url>, WscError> {
+pub fn get_anchor_links(html_string: &str, page_url: Url) -> Vec<Url> {
     let html_document = Html::parse_document(html_string);
     let anchor_tag_selector = Selector::parse(
         r##"a[href]:not([download]):not([href="javascript:void(0)"]):not([href~="#"])"##,
     )
     .unwrap();
-    Ok(html_document
+    html_document
         .select(&anchor_tag_selector)
         .filter_map(|element| get_full_link(element.value().attr("href").unwrap_or(""), &page_url))
         .map(|link| Url::parse(&link).unwrap())
-        .collect::<Vec<Url>>())
+        .collect::<Vec<Url>>()
+}
+
+pub fn get_static_resource_links(html_string: &str, page_url: Url) -> Vec<Url> {
+    let html_document = Html::parse_document(html_string);
+    let css_tag_selector = Selector::parse(r#"link[href][rel="stylesheet"]"#).unwrap();
+    let js_tag_selector = Selector::parse("script[src]").unwrap();
+    html_document
+        .select(&css_tag_selector)
+        .chain(html_document.select(&js_tag_selector))
+        .map(|element| {
+            return if let Some(href) = element.value().attr("href") {
+                href
+            } else if let Some(src) = element.value().attr("src") {
+                src
+            } else {
+                ""
+            };
+        })
+        .filter_map(|link| get_full_link(link, &page_url))
+        .map(|link| Url::parse(&link).unwrap())
+        .collect::<Vec<Url>>()
 }
