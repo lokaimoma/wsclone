@@ -1,5 +1,6 @@
 use crate::download::{download_file, DownloadItem};
 use crate::errors::WscError;
+use crate::link::get_static_resource_links;
 use crate::session::Session;
 use std::future::Future;
 use std::path::PathBuf;
@@ -86,5 +87,6 @@ where
     session
         .processed_pages
         .insert(link.to_string(), index_file_path);
+
     Ok(())
 }

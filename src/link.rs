@@ -26,7 +26,11 @@ fn get_full_link(link: &str, page_url: &Url) -> Option<String> {
     }
 }
 
-pub fn get_anchor_links(html_string: &str, page_url: Url) -> Vec<Url> {
+/// Gets all valid anchor tag links. The returned vector of tuples,
+/// has as first element, the link found in the page and the second
+/// element is a parsed URL object of that link.
+/// E.g (/hello.html, https://www.example.com/hello.html as a Url object)  
+pub fn get_anchor_links(html_string: &str, page_url: Url) -> Vec<(String, Url)> {
     let html_document = Html::parse_document(html_string);
     let anchor_tag_selector = Selector::parse(
         r##"a[href]:not([download]):not([href="javascript:void(0)"]):not([href~="#"])"##,
@@ -35,10 +39,14 @@ pub fn get_anchor_links(html_string: &str, page_url: Url) -> Vec<Url> {
     html_document
         .select(&anchor_tag_selector)
         .filter_map(|element| get_full_link(element.value().attr("href").unwrap_or(""), &page_url))
-        .map(|link| Url::parse(&link).unwrap())
-        .collect::<Vec<Url>>()
+        .map(|link| (link.to_owned(), Url::parse(&link).unwrap()))
+        .collect::<Vec<(String, Url)>>()
 }
 
+/// Gets all valid anchor css and javascript file links. The returned vector of
+/// tuples, has as first element, the link found in the page and the second
+/// element is a parsed URL object of that link.
+/// E.g (/hello.js, https://www.example.com/hello.js as a Url object)
 pub fn get_static_resource_links(html_string: &str, page_url: Url) -> Vec<Url> {
     let html_document = Html::parse_document(html_string);
     let css_tag_selector = Selector::parse(r#"link[href][rel="stylesheet"]"#).unwrap();
