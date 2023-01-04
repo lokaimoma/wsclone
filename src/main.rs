@@ -16,7 +16,7 @@ async fn main() {
         "https://doc.rust-lang.org/std/vec/struct.Vec.html",
         "/media/local_disk/windows_back_up/projects/rust/myowns/wsclone/downloads",
         DownloadRule {
-            max_level: 1,
+            max_level: 2,
             max_static_file_size: 10000000,
             progress_update_interval: 5000,
             download_static_resource_with_unknown_size: false,

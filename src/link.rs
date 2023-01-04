@@ -32,11 +32,14 @@ fn get_full_link(link: &str, page_url: &Url) -> Option<String> {
 pub fn get_anchor_links(html_string: &str, page_url: Url) -> Vec<(String, Url)> {
     let html_document = Html::parse_document(html_string);
     let anchor_tag_selector = Selector::parse(
-        r##"a[href]:not([download]):not([href="javascript:void(0)"]):not([href~="#"])"##,
+        r###"
+        a[href]:not([download]):not([href="javascript:void(0)"]):not([href^="#"]):not([href~="#"])
+        "###,
     )
     .unwrap();
     html_document
         .select(&anchor_tag_selector)
+        .filter(|element| !element.value().attr("href").unwrap_or("").contains('#'))
         .filter_map(|element| get_full_link(element.value().attr("href").unwrap_or(""), &page_url))
         .map(|link| (link.to_owned(), Url::parse(&link).unwrap()))
         .collect::<Vec<(String, Url)>>()
