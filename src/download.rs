@@ -98,9 +98,9 @@ where
                 content: "Error opening destination file".into(),
             }))
             .await;
-            return Err(WscError::FailedToOpenResourceFile(
+            return Err(WscError::FileOperationError(
                 dld_item.destination_dir.to_string_lossy().to_string(),
-                e.to_string(),
+                format!("{} | {}", e, e.kind()),
             ));
         }
         Ok(f) => f,
@@ -149,9 +149,9 @@ where
                 content: "Error writing to file".into(),
             }))
             .await;
-            return Err(WscError::ErrorWritingToFile(
+            return Err(WscError::FileOperationError(
                 dld_item.destination_dir.to_string_lossy().to_string(),
-                e.to_string(),
+                format!("{} | {}", e, e.kind()),
             ));
         };
         bytes_written += chunks.len();
