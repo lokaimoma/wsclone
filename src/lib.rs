@@ -16,7 +16,6 @@ use url::Url;
 mod download;
 mod errors;
 mod link;
-mod resource;
 mod session;
 
 #[derive(Debug, Clone)]
@@ -110,13 +109,13 @@ where
             if let Some(mut pages) = download_page_with_static_resources(
                 session_id,
                 dest_dir,
-                &mut rule,
+                &rule,
                 on_update,
                 &client,
                 &session_lock,
                 more_pages,
                 raw_link,
-                &pg_url,
+                pg_url,
                 None,
             )
             .await?
@@ -225,9 +224,9 @@ where
                         raw_link,
                         parsed_link,
                         sess_id,
-                        &dl_rule,
+                        dl_rule.clone(),
                         dl_dir,
-                        &cli,
+                        cli,
                         session,
                     );
                     dld_tasks.push(task);
@@ -264,7 +263,7 @@ where
 async fn link_page_to_static_resources(
     page_file_path: &str,
     raw_links: &Vec<String>,
-    res_f_loc: &Vec<String>,
+    res_f_loc: &[String],
 ) -> Result<(), WscError> {
     let html_string = match fs::read_to_string(&page_file_path).await {
         Ok(s) => s,
@@ -324,9 +323,9 @@ fn download_static_resource<F>(
     raw_link: String,
     parsed_link: Url,
     sess_id: String,
-    dl_rule: &DownloadRule,
+    dl_rule: DownloadRule,
     dl_dir: String,
-    cli: &Arc<Client>,
+    cli: Arc<Client>,
     session: Arc<RwLock<Session>>,
 ) -> JoinHandle<Option<WscError>>
 where

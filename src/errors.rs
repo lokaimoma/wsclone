@@ -1,10 +1,6 @@
 #[derive(Debug, PartialEq)]
 pub enum WscError {
-    ResourceAlreadyRegistered,
-    FailedToConnectToServer(String),
     ErrorDownloadingResource(String),
-    ErrorFetchingResourceInfo(String),
-    ErrorParsingIndexUrl(String),
     ErrorCreatingDestinationDirectory(String),
     InvalidHtml,
     UnknownError(String),

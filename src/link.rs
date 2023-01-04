@@ -1,4 +1,3 @@
-use crate::errors::WscError;
 use scraper::{Html, Selector};
 use tracing::{event, instrument, Level};
 use url::{ParseError, Url};
@@ -64,6 +63,6 @@ pub fn get_static_resource_links(html_string: &str, page_url: Url) -> Vec<(Strin
             };
         })
         .filter_map(|link| get_full_link(link, &page_url))
-        .map(|link| (link, Url::parse(&link).unwrap()))
+        .map(|link| (link.clone(), Url::parse(&link).unwrap()))
         .collect::<Vec<(String, Url)>>()
 }
