@@ -1,27 +1,29 @@
+use libwsclone::{init_download, DownloadRule, Update};
+
+async fn print(update: Update) {
+    print!("{:?}", update);
+}
+
 #[tokio::main]
 async fn main() {
-    // let format = tracing_subscriber::fmt::format().pretty();
-    // tracing_subscriber::fmt()
-    //     .with_env_filter("libwsclone=warn")
-    //     .event_format(format)
-    //     .init();
-    // let mut session = Session {
-    //     title: "".to_string(),
-    //     index_url: "https://docs.rs/futures/latest/futures/future/trait.TryFutureExt.html"
-    //         .to_string(),
-    //     destination_directory: "./downloads".to_string(),
-    //     processed_pages: Default::default(),
-    //     processed_resource_links: Default::default(),
-    // };
-    // init_session_download(
-    //     &mut session,
-    //     DownloadRule {
-    //         max_static_resource_download_size: 500000,
-    //         progress_update_interval: 10000,
-    //         should_download_resource_with_unknown_size: false,
-    //         max_level: 1,
-    //     },
-    // )
-    // .await
-    // .unwrap();
+    let format = tracing_subscriber::fmt::format().pretty();
+    tracing_subscriber::fmt()
+        .with_env_filter("libwsclone=warn")
+        .event_format(format)
+        .init();
+    init_download(
+        "clio123",
+        "https://doc.rust-lang.org/std/vec/struct.Vec.html",
+        "/media/local_disk/windows_back_up/projects/rust/myowns/wsclone/downloads",
+        DownloadRule {
+            max_level: 1,
+            max_static_file_size: 10000000,
+            progress_update_interval: 5000,
+            download_static_resource_with_unknown_size: false,
+            black_list_urls: Vec::new(),
+        },
+        print,
+    )
+    .await
+    .unwrap();
 }

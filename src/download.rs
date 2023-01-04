@@ -81,6 +81,7 @@ where
     dld_item.destination_dir.push(&f_name);
 
     let mut dest_file = match OpenOptions::new()
+        .write(true)
         .create_new(true)
         .open(dld_item.destination_dir.as_path())
         .await
