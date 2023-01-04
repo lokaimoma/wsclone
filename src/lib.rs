@@ -290,15 +290,16 @@ async fn link_page_to_static_resources(
     };
 
     let mut file = match fs::OpenOptions::new()
-        .create_new(true)
+        .create(true)
         .write(true)
+        .truncate(true)
         .open(&page_file_path)
         .await
     {
         Ok(f) => f,
         Err(e) => {
             tracing::error!("Error opening file : {}", page_file_path);
-            tracing::error!("{}", e);
+            tracing::error!("{} | {}", e, e.kind());
             return Err(WscError::FileOperationError(
                 page_file_path.into(),
                 format!("{} | {}", e, e.kind()),

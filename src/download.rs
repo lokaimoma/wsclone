@@ -82,7 +82,7 @@ where
 
     let mut dest_file = match OpenOptions::new()
         .write(true)
-        .create_new(true)
+        .create(true)
         .open(dld_item.destination_dir.as_path())
         .await
     {
@@ -91,7 +91,7 @@ where
                 "Error opening/creating file {}",
                 dld_item.destination_dir.to_str().unwrap()
             );
-            tracing::error!("{}", e);
+            tracing::error!("{} | {}", e, e.kind());
             on_update(MessageUpdate(Message {
                 session_id,
                 resource_name: f_name,
