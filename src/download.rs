@@ -6,6 +6,7 @@ use phf::phf_map;
 use reqwest::header::HeaderMap;
 use reqwest::{header, Client};
 use std::future::Future;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -140,15 +141,33 @@ where
                 "Error downloading resource from {}",
                 dld_item.link.to_string()
             );
-            on_update(MessageUpdate(Message {
-                session_id,
-                resource_name: f_name,
-                is_error: true,
-                content: "Network error".into(),
-            }))
-            .await;
             tracing::error!("{}", e);
-            return Err(WscError::NetworkError(e.to_string()));
+            if e.is_connect() {
+                on_update(MessageUpdate(Message {
+                    session_id,
+                    resource_name: f_name,
+                    is_error: true,
+                    content: "Network error".into(),
+                }))
+                .await;
+                return Err(WscError::NetworkError(e.to_string()));
+            } else if e.is_status() {
+                let status = e.status().unwrap();
+                on_update(MessageUpdate(Message {
+                    session_id,
+                    resource_name: f_name,
+                    is_error: true,
+                    content: format!("Error status code : {}", status),
+                }))
+                .await;
+                if rule.abort_on_error_status {
+                    return Err(WscError::ErrorStatusCode {
+                        status_code: status.to_string(),
+                        url: dld_item.link.to_string(),
+                    });
+                }
+            }
+            return Ok(None);
         }
         Ok(bytes) => bytes,
     } {

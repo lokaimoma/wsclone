@@ -55,6 +55,16 @@ pub struct Progress {
     pub session_id: String,
 }
 
+#[derive(Clone)]
+struct DownloadProp {
+    session_id: String,
+    dest_dir: String,
+    rule: DownloadRule,
+    file_name: Option<String>,
+    session: Arc<RwLock<Session>>,
+    client: Arc<Client>,
+}
+
 #[instrument]
 pub async fn init_download<F>(
     session_id: &str,
@@ -81,16 +91,18 @@ where
     }));
 
     let mut a_href_links: Vec<(String, Url)> = match download_page_with_static_resources(
-        session_id,
-        dest_dir,
-        &rule,
         on_update,
-        &client,
-        &session_lock,
         rule.max_level - 1 > 0,
         link,
         &Url::parse(link).unwrap(),
-        Some("index.html".to_string()),
+        DownloadProp {
+            session_id: session_id.to_string(),
+            dest_dir: dest_dir.to_string(),
+            rule: rule.clone(),
+            file_name: Some("index.html".to_string()),
+            session: session_lock.clone(),
+            client: client.clone(),
+        },
     )
     .await
     {
@@ -109,16 +121,18 @@ where
         let mut new_pages: Vec<(String, Url)> = Vec::new();
         for (raw_link, pg_url) in a_href_links.iter() {
             if let Some(mut pages) = download_page_with_static_resources(
-                session_id,
-                dest_dir,
-                &rule,
                 on_update,
-                &client,
-                &session_lock,
                 more_pages,
                 raw_link,
                 pg_url,
-                None,
+                DownloadProp {
+                    rule: rule.clone(),
+                    file_name: None,
+                    session_id: session_id.to_string(),
+                    dest_dir: dest_dir.to_string(),
+                    client: client.clone(),
+                    session: session_lock.clone(),
+                },
             )
             .await?
             {
@@ -152,16 +166,11 @@ where
 }
 
 async fn download_page_with_static_resources<F>(
-    session_id: &str,
-    dest_dir: &str,
-    rule: &DownloadRule,
     on_update: fn(Update) -> F,
-    client: &Arc<Client>,
-    session_lock: &Arc<RwLock<Session>>,
     more_pages: bool,
     raw_link: &str,
     pg_url: &Url,
-    file_name: Option<String>,
+    prop: DownloadProp,
 ) -> Result<Option<Vec<(String, Url)>>, WscError>
 where
     F: Future + Send + 'static,
@@ -169,15 +178,15 @@ where
     let mut pages: Option<Vec<(String, Url)>> = None;
 
     match download_file(
-        session_id.into(),
+        prop.session_id.to_string(),
         DownloadItem {
             link: pg_url.to_owned(),
-            destination_dir: PathBuf::from(dest_dir),
+            destination_dir: PathBuf::from(&prop.dest_dir),
         },
-        &client,
-        &rule,
+        &prop.client,
+        &prop.rule,
         on_update,
-        file_name,
+        prop.file_name.clone(),
     )
     .await
     {
@@ -185,7 +194,7 @@ where
         Ok(res) => {
             if res.is_some() {
                 let page_f_path = res.unwrap();
-                session_lock
+                prop.session
                     .write()
                     .await
                     .processed_pages
@@ -194,10 +203,10 @@ where
                     Err(e) => {
                         tracing::error!("Error reading file {}", page_f_path);
                         tracing::error!("{}", e);
-                        return Err(WscError::FileOperationError(
-                            page_f_path,
-                            format!("{} | {}", e, e.kind()),
-                        ));
+                        return Err(WscError::FileOperationError {
+                            file_name: page_f_path,
+                            message: format!("{} | {}", e, e.kind()),
+                        });
                     }
                     Ok(html) => {
                         if more_pages {
@@ -208,7 +217,8 @@ where
                 };
                 let mut dld_tasks: Vec<JoinHandle<Option<WscError>>> = Vec::new();
                 for (raw_link, parsed_link) in static_res_links {
-                    if session_lock
+                    if prop
+                        .session
                         .read()
                         .await
                         .processed_static_files
@@ -216,21 +226,8 @@ where
                     {
                         continue;
                     }
-                    let sess_id = session_id.to_string();
-                    let dl_rule = rule.clone();
-                    let dl_dir = dest_dir.to_string();
-                    let cli = client.clone();
-                    let session = session_lock.clone();
-                    let task = download_static_resource(
-                        on_update,
-                        raw_link,
-                        parsed_link,
-                        sess_id,
-                        dl_rule.clone(),
-                        dl_dir,
-                        cli,
-                        session,
-                    );
+                    let task =
+                        download_static_resource(on_update, raw_link, parsed_link, prop.clone());
                     dld_tasks.push(task);
                 }
 
@@ -240,7 +237,14 @@ where
                             if opt_error.is_some() {
                                 let err = opt_error.unwrap();
                                 if matches!(err, WscError::DestinationDirectoryDoesNotExist(_))
-                                    || matches!(err, WscError::ErrorDownloadingResource(_))
+                                    || matches!(err, WscError::NetworkError(_))
+                                    || (matches!(
+                                        err,
+                                        WscError::ErrorStatusCode {
+                                            status_code: _,
+                                            url: _
+                                        }
+                                    ) && prop.rule.abort_on_error_status)
                                 {
                                     return Err(err);
                                 } else {
@@ -272,10 +276,10 @@ async fn link_page_to_static_resources(
         Err(e) => {
             tracing::error!("Error reading file {}", page_file_path);
             tracing::error!("{} | {}", e, e.kind());
-            return Err(WscError::FileOperationError(
-                page_file_path.into(),
-                format!("{} | {}", e, e.kind()),
-            ));
+            return Err(WscError::FileOperationError {
+                file_name: page_file_path.into(),
+                message: format!("{} | {}", e, e.kind()),
+            });
         }
     };
 
@@ -302,20 +306,20 @@ async fn link_page_to_static_resources(
         Err(e) => {
             tracing::error!("Error opening file : {}", page_file_path);
             tracing::error!("{} | {}", e, e.kind());
-            return Err(WscError::FileOperationError(
-                page_file_path.into(),
-                format!("{} | {}", e, e.kind()),
-            ));
+            return Err(WscError::FileOperationError {
+                file_name: page_file_path.into(),
+                message: format!("{} | {}", e, e.kind()),
+            });
         }
     };
 
     if let Err(e) = file.write_all(&final_html_bytes).await {
         tracing::error!("Error writing to file : {}", page_file_path);
         tracing::error!("{}", e);
-        return Err(WscError::FileOperationError(
-            page_file_path.into(),
-            format!("{} | {}", e, e.kind()),
-        ));
+        return Err(WscError::FileOperationError {
+            file_name: page_file_path.into(),
+            message: format!("{} | {}", e, e.kind()),
+        });
     }
 
     Ok(())
@@ -325,36 +329,33 @@ fn download_static_resource<F>(
     on_update: fn(Update) -> F,
     raw_link: String,
     parsed_link: Url,
-    sess_id: String,
-    dl_rule: DownloadRule,
-    dl_dir: String,
-    cli: Arc<Client>,
-    session: Arc<RwLock<Session>>,
+    mut prop: DownloadProp,
 ) -> JoinHandle<Option<WscError>>
 where
     F: Future + Send + 'static,
 {
+    prop.file_name = None;
     spawn(async move {
         return match download_file(
-            sess_id,
+            prop.session_id,
             DownloadItem {
                 link: parsed_link,
-                destination_dir: PathBuf::from(dl_dir),
+                destination_dir: PathBuf::from(prop.dest_dir),
             },
-            &cli,
-            &dl_rule,
+            &prop.client,
+            &prop.rule,
             on_update,
             None,
         )
         .await
         {
             Ok(opt_f_path) => {
-                if opt_f_path.is_some() {
-                    session
+                if let Some(f_path) = opt_f_path {
+                    prop.session
                         .write()
                         .await
                         .processed_static_files
-                        .insert(raw_link, opt_f_path.unwrap());
+                        .insert(raw_link, f_path);
                 }
                 return None;
             }
