@@ -13,7 +13,7 @@ async fn main() {
         .init();
     init_download(
         "clio123",
-        "https://doc.rust-lang.org/std/vec/struct.Vec.html",
+        "https://docs.rs/tokio/latest/tokio/fs/struct.OpenOptions.html",
         "/media/local_disk/windows_back_up/projects/rust/myowns/wsclone/downloads",
         DownloadRule {
             max_level: 2,

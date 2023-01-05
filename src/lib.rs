@@ -29,6 +29,8 @@ pub struct DownloadRule {
     /// only the initial page and it's resources.
     pub max_level: u8,
     pub black_list_urls: Vec<String>,
+    /// Abort if the status is b/n 400 - 599. Downloads will abort if it's network error.
+    pub abort_on_error_status: bool,
 }
 
 #[derive(Debug)]

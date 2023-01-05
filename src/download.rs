@@ -33,9 +33,13 @@ pub async fn download_file<F>(
 where
     F: Future + Send + 'static,
 {
-    if rule.black_list_urls.contains(&dld_item.link.to_string()) {
-        return Ok(None);
+    let link_str = dld_item.link.to_string();
+    for link in rule.black_list_urls.iter() {
+        if link_str.contains(link) {
+            return Ok(None);
+        }
     }
+    drop(link_str);
 
     if !dld_item.destination_dir.exists() {
         return Err(WscError::DestinationDirectoryDoesNotExist(
@@ -45,18 +49,27 @@ where
 
     let mut response = match client.get(dld_item.link.to_string()).send().await {
         Err(e) => {
-            tracing::error!("Error getting file from {}", dld_item.link.to_string());
+            tracing::error!("Error downloading file from {}", dld_item.link.to_string());
             tracing::error!("{}", e);
-            return Err(WscError::ErrorDownloadingResource(
-                dld_item.link.to_string(),
-            ));
+            return Err(WscError::NetworkError(dld_item.link.to_string()));
         }
         Ok(r) => {
             if !r.status().is_success() {
                 tracing::error!("Error status code received : {}", r.status());
-                return Err(WscError::ErrorDownloadingResource(
-                    dld_item.link.to_string(),
-                ));
+                return if rule.abort_on_error_status {
+                    Err(WscError::ErrorStatusCode {
+                        status_code: r.status().to_string(),
+                        url: dld_item.link.to_string(),
+                    })
+                } else {
+                    on_update(MessageUpdate(Message {
+                        session_id: session_id.clone(),
+                        resource_name: dld_item.link.to_string(),
+                        is_error: true,
+                        content: "Error downloading resource".into(),
+                    }));
+                    Ok(None)
+                };
             }
             r
         }
@@ -99,10 +112,10 @@ where
                 content: "Error opening destination file".into(),
             }))
             .await;
-            return Err(WscError::FileOperationError(
-                dld_item.destination_dir.to_string_lossy().to_string(),
-                format!("{} | {}", e, e.kind()),
-            ));
+            return Err(WscError::FileOperationError {
+                file_name: dld_item.destination_dir.to_string_lossy().to_string(),
+                message: format!("{} | {}", e, e.kind()),
+            });
         }
         Ok(f) => f,
     };
@@ -112,7 +125,9 @@ where
         Some(s) => s.to_str().unwrap().parse::<u64>().unwrap_or(0u64),
     };
 
-    if f_size > rule.max_static_file_size {
+    if (f_size > 0 && f_size > rule.max_static_file_size)
+        || (f_size == 0 && !rule.download_static_resource_with_unknown_size)
+    {
         return Ok(None);
     }
 
@@ -133,7 +148,7 @@ where
             }))
             .await;
             tracing::error!("{}", e);
-            return Err(WscError::ErrorDownloadingResource(e.to_string()));
+            return Err(WscError::NetworkError(e.to_string()));
         }
         Ok(bytes) => bytes,
     } {
@@ -150,10 +165,10 @@ where
                 content: "Error writing to file".into(),
             }))
             .await;
-            return Err(WscError::FileOperationError(
-                dld_item.destination_dir.to_string_lossy().to_string(),
-                format!("{} | {}", e, e.kind()),
-            ));
+            return Err(WscError::FileOperationError {
+                file_name: dld_item.destination_dir.to_string_lossy().to_string(),
+                message: format!("{} | {}", e, e.kind()),
+            });
         };
         bytes_written += chunks.len();
         if Instant::now().duration_since(last_update_time) > progress_update_interval {
