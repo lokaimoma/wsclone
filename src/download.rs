@@ -56,7 +56,11 @@ where
         }
         Ok(r) => {
             if !r.status().is_success() {
-                tracing::error!("Error status code received : {}", r.status());
+                tracing::error!(
+                    "Error status code received : {} |{}|",
+                    r.status(),
+                    dld_item.link
+                );
                 return if rule.abort_on_error_status {
                     Err(WscError::ErrorStatusCode {
                         status_code: r.status().to_string(),

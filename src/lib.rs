@@ -55,7 +55,7 @@ pub struct Progress {
     pub session_id: String,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct DownloadProp {
     session_id: String,
     dest_dir: String,
@@ -158,8 +158,8 @@ where
         res_f_loc.push(r_loc.to_string());
     }
 
-    for (_, p_loc) in session_lock.read().await.processed_pages.iter() {
-        link_page_to_static_resources(p_loc, &raw_links, &res_f_loc).await?;
+    for (_, page_f_loc) in session_lock.read().await.processed_pages.iter() {
+        link_page_to_static_resources(page_f_loc, &raw_links, &res_f_loc).await?;
     }
 
     Ok(())
@@ -266,6 +266,7 @@ where
     Ok(pages)
 }
 
+#[tracing::instrument]
 async fn link_page_to_static_resources(
     page_file_path: &str,
     raw_links: &Vec<String>,
@@ -289,11 +290,18 @@ async fn link_page_to_static_resources(
 
     let ac = aho_corasick::AhoCorasick::new(raw_links);
 
+    tracing::info!("Replacing links with file path in {}", page_file_path);
+
     if let Err(e) = ac.stream_replace_all(html_string_bytes, &mut final_html_bytes, res_f_loc) {
         // Shouldn't happen though
         tracing::error!("AHOCORASICK ERROR : {}", e);
         return Err(WscError::UnknownError(e.to_string()));
     };
+
+    tracing::debug!(
+        "Bytes returned after replacement : {}",
+        final_html_bytes.len()
+    );
 
     let mut file = match fs::OpenOptions::new()
         .create(true)
