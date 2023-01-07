@@ -3,7 +3,7 @@ use clap::Parser;
 use libwsclone::{init_download, DownloadRule, Update};
 use url::Url;
 
-const PROGRESS_UPDATE_INTERVAL: u64 = 1000;
+const PROGRESS_UPDATE_INTERVAL: u64 = 50;
 
 #[derive(Parser, Debug)]
 #[command(

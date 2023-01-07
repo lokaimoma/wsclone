@@ -82,7 +82,10 @@ where
         return Err(WscError::ErrorCreatingDestinationDirectory(e.to_string()));
     };
 
-    let client = Arc::new(Client::new());
+    let client = Arc::new(Client::builder()
+        .user_agent(
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
+        ).build().unwrap());
 
     let session_lock = Arc::new(RwLock::new(Session {
         session_id: session_id.to_string(),
