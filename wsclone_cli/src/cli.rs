@@ -1,5 +1,5 @@
 use chrono::Utc;
-use clap::{ArgAction, Parser};
+use clap::Parser;
 use libwsclone::{init_download, DownloadRule, Update};
 use url::Url;
 
@@ -38,8 +38,27 @@ pub struct Cli {
 
 impl Cli {
     pub async fn download(&self) {
-        let on_update = |update: Update| async {};
-        let _a = init_download(
+        log::info!("Initializing download....");
+        let on_update = |update: Update| async {
+            match update {
+                Update::MessageUpdate(msg) => {
+                    if msg.is_error {
+                        log::error!("{} | {}", msg.content, msg.resource_name);
+                    } else {
+                        log::info!("{} | {}", msg.content, msg.resource_name);
+                    }
+                }
+                Update::ProgressUpdate(prog) => {
+                    log::info!(
+                        "{} : | Bytes Written : {} | Total Size: {}",
+                        prog.resource_name,
+                        prog.bytes_written,
+                        prog.file_size
+                    );
+                }
+            }
+        };
+        match init_download(
             &format!("Session-{}", Utc::now().timestamp()),
             self.url.as_ref(),
             &self.output_directory,
@@ -55,6 +74,18 @@ impl Cli {
             },
             on_update,
         )
-        .await;
+        .await
+        {
+            Ok(_) => {
+                log::info!(
+                    "Webpage(s) downloaded successfully. {}",
+                    self.output_directory
+                );
+            }
+            Err(e) => {
+                log::error!("Download wasn't able to complete");
+                log::error!("{:?}", e);
+            }
+        };
     }
 }
