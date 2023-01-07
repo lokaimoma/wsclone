@@ -211,6 +211,12 @@ where
         &dld_item.link,
         dld_item.destination_dir.to_str().unwrap()
     );
+    (on_update)(ProgressUpdate(Progress {
+        bytes_written: bytes_written as u64,
+        file_size: f_size,
+        resource_name: f_name,
+        session_id,
+    }));
     Ok(Some(dld_item.destination_dir.to_string_lossy().to_string()))
 }
 
