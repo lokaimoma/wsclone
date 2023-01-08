@@ -101,7 +101,14 @@ where
         DownloadProp {
             session_id: session_id.to_string(),
             dest_dir: dest_dir.to_string(),
-            rule: rule.clone(),
+            rule: DownloadRule {
+                black_list_urls: rule.black_list_urls.clone(),
+                max_level: rule.max_level,
+                abort_on_error_status: true,
+                max_static_file_size: rule.max_static_file_size,
+                download_static_resource_with_unknown_size: true,
+                progress_update_interval: rule.progress_update_interval,
+            },
             file_name: Some("index.html".to_string()),
             session: session_lock.clone(),
             client: client.clone(),
