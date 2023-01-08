@@ -1,9 +1,11 @@
 use chrono::Utc;
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
 use libwsclone::{init_download, DownloadRule, Update};
+use std::collections::HashMap;
 use url::Url;
 
-const PROGRESS_UPDATE_INTERVAL: u64 = 50;
+const PROGRESS_UPDATE_INTERVAL: u64 = 1000;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -39,6 +41,7 @@ pub struct Cli {
 impl Cli {
     pub async fn download(&self) {
         log::info!("Initializing download....");
+        let mut pb_files: HashMap<String, ProgressBar> = HashMap::new();
         let on_update = |update: Update| async {
             match update {
                 Update::MessageUpdate(msg) => {
@@ -49,12 +52,20 @@ impl Cli {
                     }
                 }
                 Update::ProgressUpdate(prog) => {
-                    log::info!(
-                        "{} : | Bytes Written : {} | Total Size: {}",
-                        prog.resource_name,
-                        prog.bytes_written,
-                        prog.file_size
-                    );
+                    if let Some(pb) = pb_files.get(&prog.resource_name) {
+                        pb.inc(prog.bytes_written);
+                    } else {
+                        let sty = ProgressStyle::with_template(
+                            "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+                        )
+                        .unwrap()
+                        .progress_chars("##-");
+                        let pb = ProgressBar::new(prog.file_size);
+                        pb.set_style(sty);
+                        pb.tick();
+                        pb.set_message(prog.resource_name.clone());
+                        pb_files.insert(prog.resource_name, pb);
+                    }
                 }
             }
         };
@@ -84,7 +95,7 @@ impl Cli {
             }
             Err(e) => {
                 log::error!("Download wasn't able to complete");
-                log::error!("{:?}", e);
+                log::error!("{}", e);
             }
         };
     }

@@ -5,7 +5,6 @@ use chrono::Utc;
 use phf::phf_map;
 use reqwest::header::HeaderMap;
 use reqwest::{header, Client};
-use std::future::Future;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -21,18 +20,17 @@ pub struct DownloadItem {
     pub destination_dir: PathBuf,
 }
 
-#[tracing::instrument]
 /// Takes care of downloading a file. The returned optional string is the path to the downloaded file
 pub async fn download_file<F>(
     session_id: String,
     mut dld_item: DownloadItem,
     client: &Arc<Client>,
     rule: &DownloadRule,
-    on_update: fn(Update) -> F,
+    mut on_update: F,
     file_name: Option<String>,
 ) -> Result<Option<String>, WscError>
 where
-    F: Future + Send + 'static,
+    F: FnMut(Update) -> futures::future::BoxFuture<'static, ()> + Send,
 {
     let link_str = dld_item.link.to_string();
     for link in rule.black_list_urls.iter() {
@@ -67,7 +65,7 @@ where
                         url: dld_item.link.to_string(),
                     })
                 } else {
-                    on_update(MessageUpdate(Message {
+                    (on_update)(MessageUpdate(Message {
                         session_id: session_id.clone(),
                         resource_name: dld_item.link.to_string(),
                         is_error: true,
