@@ -1,7 +1,9 @@
+use std::fmt::Formatter;
+
 #[derive(Debug, PartialEq)]
 pub enum WscError {
     ErrorCreatingDestinationDirectory(String),
-    InvalidHtml,
+    InvalidHtml(String),
     UnknownError(String),
     /// Parameter is path to directory
     DestinationDirectoryDoesNotExist(String),
@@ -16,3 +18,32 @@ pub enum WscError {
         url: String,
     },
 }
+
+impl std::fmt::Display for WscError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            WscError::ErrorCreatingDestinationDirectory(err) => {
+                format!("error creating destination directory. {}", err)
+            }
+            WscError::InvalidHtml(f_name) => {
+                format!("error processing page content in file {}", f_name)
+            }
+            WscError::UnknownError(err) => format!("an unknown error occurred. {}", err),
+            WscError::DestinationDirectoryDoesNotExist(dir) => format!(
+                "the provided destination directory {}, does not exist.",
+                dir
+            ),
+            WscError::FileOperationError { file_name, message } => {
+                format!("{} : {}", message, file_name)
+            }
+            WscError::NetworkError(err) => format!("error connecting to internet. {}", err),
+            WscError::ErrorStatusCode { status_code, url } => format!(
+                "server returned an error response. {} => {}",
+                url, status_code
+            ),
+        };
+        write!(f, "{}", str)
+    }
+}
+
+impl std::error::Error for WscError {}
