@@ -47,11 +47,15 @@ pub async fn download_file(
 
     let mut response = match client.get(dld_item.link.to_string()).send().await {
         Err(e) => {
-            if e.is_redirect() {
-                return Ok(None);
-            }
             tracing::error!("Error downloading file from {}", dld_item.link.to_string());
             tracing::error!("{}", e);
+            // File name is always passed for first page.
+            // If it's the first page, then we want to
+            // abort the whole download irrespective of
+            // the abort rule. Otherwise follow the rule.
+            if !rule.abort_on_download_error || file_name.is_some() {
+                return Ok(None);
+            }
             return Err(WscError::NetworkError(dld_item.link.to_string()));
         }
         Ok(r) => {
@@ -61,7 +65,7 @@ pub async fn download_file(
                     r.status(),
                     dld_item.link
                 );
-                return if rule.abort_on_error_status {
+                return if rule.abort_on_download_error {
                     Err(WscError::ErrorStatusCode {
                         status_code: r.status().to_string(),
                         url: dld_item.link.to_string(),
@@ -174,7 +178,7 @@ pub async fn download_file(
                     }))
                     .await
                 {};
-                if rule.abort_on_error_status {
+                if rule.abort_on_download_error {
                     return Err(WscError::ErrorStatusCode {
                         status_code: status.to_string(),
                         url: dld_item.link.to_string(),

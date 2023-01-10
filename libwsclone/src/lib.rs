@@ -29,8 +29,8 @@ pub struct DownloadRule {
     /// only the initial page and it's resources.
     pub max_level: u8,
     pub black_list_urls: Vec<String>,
-    /// Abort if the status is b/n 400 - 599. Downloads will abort if it's network error.
-    pub abort_on_error_status: bool,
+    /// Abort download if any resource other than the first page encounters an error.
+    pub abort_on_download_error: bool,
 }
 
 #[derive(Debug)]
@@ -101,7 +101,7 @@ pub async fn init_download(
             rule: DownloadRule {
                 black_list_urls: rule.black_list_urls.clone(),
                 max_level: rule.max_level,
-                abort_on_error_status: true,
+                abort_on_download_error: true,
                 max_static_file_size: rule.max_static_file_size,
                 download_static_resource_with_unknown_size: true,
                 progress_update_interval: rule.progress_update_interval,
@@ -251,7 +251,7 @@ async fn download_page_with_static_resources(
                                             status_code: _,
                                             url: _
                                         }
-                                    ) && prop.rule.abort_on_error_status)
+                                    ) && prop.rule.abort_on_download_error)
                                 {
                                     return Err(err);
                                 } else {

@@ -24,10 +24,10 @@ pub struct Cli {
     #[arg(default_value = "1", long)]
     max_level: u8,
     #[arg(
-        help = "Abort download if an error status code is received(400-599). Defaults to false.",
+        help = "Abort download if any resource other than the first page encounters an error.",
         long
     )]
-    abort_on_error_status: Option<bool>,
+    abort_on_download_error: Option<bool>,
     #[arg(
         help = "Download files even if their size can't be determined. Defaults to true.",
         long
@@ -51,7 +51,7 @@ pub async fn download(cli: Cli) {
             &cli.output_directory,
             DownloadRule {
                 max_level: cli.max_level,
-                abort_on_error_status: cli.abort_on_error_status.unwrap_or(false),
+                abort_on_download_error: cli.abort_on_download_error.unwrap_or(false),
                 download_static_resource_with_unknown_size: cli
                     .download_files_with_unknown_size
                     .unwrap_or(true),
