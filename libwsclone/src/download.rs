@@ -153,6 +153,16 @@ pub async fn download_file(
             f_name,
             dld_item.link.to_string()
         );
+        if (update_tx
+            .send(ProgressUpdate(Progress {
+                bytes_written: f_size,
+                file_size: f_size,
+                resource_name: f_name.clone(),
+                session_id,
+            }))
+            .await)
+            .is_err()
+        {};
         return Ok(Some(f_name));
     }
 
