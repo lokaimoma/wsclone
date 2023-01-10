@@ -146,6 +146,16 @@ pub async fn download_file(
         return Ok(None);
     }
 
+    if f_size != 0 && dest_file.metadata().await.unwrap().len() >= f_size {
+        let f_name = dld_item.destination_dir.to_string_lossy().to_string();
+        tracing::debug!(
+            "File : |{}| from |{}| has already been downloaded.",
+            f_name,
+            dld_item.link.to_string()
+        );
+        return Ok(Some(f_name));
+    }
+
     let progress_update_interval = Duration::from_millis(rule.progress_update_interval);
     let mut last_update_time = Instant::now() - progress_update_interval;
     let mut bytes_written = 0;
@@ -157,14 +167,15 @@ pub async fn download_file(
             );
             tracing::error!("{}", e);
             if e.is_connect() {
-                if let Err(_) = update_tx
+                if (update_tx
                     .send(MessageUpdate(Message {
                         session_id,
                         resource_name: f_name,
                         is_error: true,
                         content: "Network error".into(),
                     }))
-                    .await
+                    .await)
+                    .is_err()
                 {};
                 return Err(WscError::NetworkError(e.to_string()));
             } else if e.is_status() {
@@ -217,9 +228,8 @@ pub async fn download_file(
                 resource_name: f_name.to_owned(),
                 session_id: session_id.to_owned(),
             })) {
-                match e {
-                    TrySendError::Closed(_) => return Err(WscError::ChannelClosed),
-                    _ => {}
+                if let TrySendError::Closed(_) = e {
+                    return Err(WscError::ChannelClosed);
                 }
             } else {
                 last_update_time = Instant::now();
@@ -232,7 +242,7 @@ pub async fn download_file(
         &dld_item.link,
         dld_item.destination_dir.to_str().unwrap()
     );
-    if let Err(_) = update_tx
+    if (update_tx
         .send(ProgressUpdate(Progress {
             bytes_written: bytes_written as u64,
             file_size: if f_size == 0 {
@@ -243,7 +253,8 @@ pub async fn download_file(
             resource_name: f_name,
             session_id,
         }))
-        .await
+        .await)
+        .is_err()
     {};
     Ok(Some(dld_item.destination_dir.to_string_lossy().to_string()))
 }
