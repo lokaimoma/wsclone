@@ -1,3 +1,4 @@
+use crate::cli::download;
 use clap::Parser;
 
 mod cli;
@@ -8,5 +9,5 @@ async fn main() {
         .filter(Some("wsclone"), log::LevelFilter::Trace)
         .init();
     let cli = cli::Cli::parse();
-    cli.download().await;
+    download(cli).await;
 }

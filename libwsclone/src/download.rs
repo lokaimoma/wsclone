@@ -47,6 +47,9 @@ pub async fn download_file(
 
     let mut response = match client.get(dld_item.link.to_string()).send().await {
         Err(e) => {
+            if e.is_redirect() {
+                return Ok(None);
+            }
             tracing::error!("Error downloading file from {}", dld_item.link.to_string());
             tracing::error!("{}", e);
             return Err(WscError::NetworkError(dld_item.link.to_string()));
@@ -64,14 +67,15 @@ pub async fn download_file(
                         url: dld_item.link.to_string(),
                     })
                 } else {
-                    if let Err(_) = update_tx
+                    if (update_tx
                         .send(MessageUpdate(Message {
                             session_id: session_id.clone(),
                             resource_name: dld_item.link.to_string(),
                             is_error: true,
                             content: "Error downloading resource".into(),
                         }))
-                        .await
+                        .await)
+                        .is_err()
                     {};
                     Ok(None)
                 };

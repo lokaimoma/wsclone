@@ -3,9 +3,11 @@ use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use libwsclone::{init_download, DownloadRule, Update};
 use std::collections::HashMap;
+use tokio::sync::mpsc::channel;
 use url::Url;
 
 const PROGRESS_UPDATE_INTERVAL: u64 = 1000;
+const MAX_BUFFER_SIZE: usize = 100;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -38,64 +40,65 @@ pub struct Cli {
     blacklist_urls: Vec<String>,
 }
 
-impl Cli {
-    pub async fn download(&self) {
-        log::info!("Initializing download....");
-        let mut pb_files: HashMap<String, ProgressBar> = HashMap::new();
-        let on_update = |update: Update| async {
-            match update {
-                Update::MessageUpdate(msg) => {
-                    if msg.is_error {
-                        log::error!("{} | {}", msg.content, msg.resource_name);
-                    } else {
-                        log::info!("{} | {}", msg.content, msg.resource_name);
-                    }
-                }
-                Update::ProgressUpdate(prog) => {
-                    if let Some(pb) = pb_files.get(&prog.resource_name) {
-                        pb.inc(prog.bytes_written);
-                    } else {
-                        let sty = ProgressStyle::with_template(
-                            "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
-                        )
-                        .unwrap()
-                        .progress_chars("##-");
-                        let pb = ProgressBar::new(prog.file_size);
-                        pb.set_style(sty);
-                        pb.tick();
-                        pb.set_message(prog.resource_name.clone());
-                        pb_files.insert(prog.resource_name, pb);
-                    }
-                }
-            }
-        };
+pub async fn download(cli: Cli) {
+    log::info!("Initializing download....");
+    let mut pb_files: HashMap<String, ProgressBar> = HashMap::new();
+    let (tx, mut rx) = channel::<Update>(MAX_BUFFER_SIZE);
+    tokio::spawn(async move {
         match init_download(
             &format!("Session-{}", Utc::now().timestamp()),
-            self.url.as_ref(),
-            &self.output_directory,
+            cli.url.as_ref(),
+            &cli.output_directory,
             DownloadRule {
-                max_level: self.max_level,
-                abort_on_error_status: self.abort_on_error_status.unwrap_or(false),
-                download_static_resource_with_unknown_size: self
+                max_level: cli.max_level,
+                abort_on_error_status: cli.abort_on_error_status.unwrap_or(false),
+                download_static_resource_with_unknown_size: cli
                     .download_files_with_unknown_size
                     .unwrap_or(true),
                 progress_update_interval: PROGRESS_UPDATE_INTERVAL,
-                max_static_file_size: self.max_file_size,
-                black_list_urls: self.blacklist_urls.clone(),
+                max_static_file_size: cli.max_file_size,
+                black_list_urls: cli.blacklist_urls.clone(),
             },
-            on_update,
+            tx,
         )
         .await
         {
             Ok(_) => {
                 log::info!(
                     "Webpage(s) downloaded successfully. {}",
-                    self.output_directory
+                    cli.output_directory
                 );
             }
             Err(e) => {
                 log::error!("Download wasn't able to complete");
                 log::error!("{}", e);
+            }
+        }
+    });
+    while let Some(update) = rx.recv().await {
+        match update {
+            Update::MessageUpdate(msg) => {
+                if msg.is_error {
+                    log::error!("{} | {}", msg.content, msg.resource_name);
+                } else {
+                    log::info!("{} | {}", msg.content, msg.resource_name);
+                }
+            }
+            Update::ProgressUpdate(prog) => {
+                if let Some(pb) = pb_files.get(&prog.resource_name) {
+                    pb.inc(prog.bytes_written);
+                } else {
+                    let sty = ProgressStyle::with_template(
+                        "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+                    )
+                    .unwrap()
+                    .progress_chars("##-");
+                    let pb = ProgressBar::new(prog.file_size);
+                    pb.set_style(sty);
+                    pb.tick();
+                    pb.set_message(prog.resource_name.clone());
+                    pb_files.insert(prog.resource_name, pb);
+                }
             }
         };
     }
