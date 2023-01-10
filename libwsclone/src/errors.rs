@@ -17,6 +17,7 @@ pub enum WscError {
         status_code: String,
         url: String,
     },
+    ChannelClosed,
 }
 
 impl std::fmt::Display for WscError {
@@ -41,6 +42,7 @@ impl std::fmt::Display for WscError {
                 "server returned an error response. {} => {}",
                 url, status_code
             ),
+            WscError::ChannelClosed => format!("Channel closed before download completion"),
         };
         write!(f, "{}", str)
     }

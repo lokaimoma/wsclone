@@ -11,6 +11,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
+use tokio::sync::mpsc::error::TrySendError;
+use tokio::sync::mpsc::Sender;
 use tokio::time::Instant;
 use url::Url;
 
@@ -21,17 +23,14 @@ pub struct DownloadItem {
 }
 
 /// Takes care of downloading a file. The returned optional string is the path to the downloaded file
-pub async fn download_file<F>(
+pub async fn download_file(
     session_id: String,
     mut dld_item: DownloadItem,
     client: &Arc<Client>,
     rule: &DownloadRule,
-    mut on_update: F,
+    update_tx: Sender<Update>,
     file_name: Option<String>,
-) -> Result<Option<String>, WscError>
-where
-    F: FnMut(Update) -> futures::future::BoxFuture<'static, ()> + Send,
-{
+) -> Result<Option<String>, WscError> {
     let link_str = dld_item.link.to_string();
     for link in rule.black_list_urls.iter() {
         if link_str.contains(link) {
@@ -65,12 +64,15 @@ where
                         url: dld_item.link.to_string(),
                     })
                 } else {
-                    (on_update)(MessageUpdate(Message {
-                        session_id: session_id.clone(),
-                        resource_name: dld_item.link.to_string(),
-                        is_error: true,
-                        content: "Error downloading resource".into(),
-                    }));
+                    if let Err(_) = update_tx
+                        .send(MessageUpdate(Message {
+                            session_id: session_id.clone(),
+                            resource_name: dld_item.link.to_string(),
+                            is_error: true,
+                            content: "Error downloading resource".into(),
+                        }))
+                        .await
+                    {};
                     Ok(None)
                 };
             }
@@ -108,13 +110,15 @@ where
                 dld_item.destination_dir.to_str().unwrap()
             );
             tracing::error!("{} | {}", e, e.kind());
-            on_update(MessageUpdate(Message {
-                session_id,
-                resource_name: f_name,
-                is_error: true,
-                content: "Error opening destination file".into(),
-            }))
-            .await;
+            if let Err(_) = update_tx
+                .send(MessageUpdate(Message {
+                    session_id,
+                    resource_name: f_name,
+                    is_error: true,
+                    content: "Error opening destination file".into(),
+                }))
+                .await
+            {};
             return Err(WscError::FileOperationError {
                 file_name: dld_item.destination_dir.to_string_lossy().to_string(),
                 message: format!("{} | {}", e, e.kind()),
@@ -145,23 +149,27 @@ where
             );
             tracing::error!("{}", e);
             if e.is_connect() {
-                on_update(MessageUpdate(Message {
-                    session_id,
-                    resource_name: f_name,
-                    is_error: true,
-                    content: "Network error".into(),
-                }))
-                .await;
+                if let Err(_) = update_tx
+                    .send(MessageUpdate(Message {
+                        session_id,
+                        resource_name: f_name,
+                        is_error: true,
+                        content: "Network error".into(),
+                    }))
+                    .await
+                {};
                 return Err(WscError::NetworkError(e.to_string()));
             } else if e.is_status() {
                 let status = e.status().unwrap();
-                on_update(MessageUpdate(Message {
-                    session_id,
-                    resource_name: f_name,
-                    is_error: true,
-                    content: format!("Error status code : {}", status),
-                }))
-                .await;
+                if let Err(_) = update_tx
+                    .send(MessageUpdate(Message {
+                        session_id,
+                        resource_name: f_name,
+                        is_error: true,
+                        content: format!("Error status code : {}", status),
+                    }))
+                    .await
+                {};
                 if rule.abort_on_error_status {
                     return Err(WscError::ErrorStatusCode {
                         status_code: status.to_string(),
@@ -179,13 +187,15 @@ where
                 dld_item.destination_dir.to_str().unwrap()
             );
             tracing::error!("{} | {}", e, e.kind());
-            on_update(MessageUpdate(Message {
-                session_id,
-                resource_name: f_name,
-                is_error: true,
-                content: "Error writing to file".into(),
-            }))
-            .await;
+            if let Err(_) = update_tx
+                .send(MessageUpdate(Message {
+                    session_id,
+                    resource_name: f_name,
+                    is_error: true,
+                    content: "Error writing to file".into(),
+                }))
+                .await
+            {};
             return Err(WscError::FileOperationError {
                 file_name: dld_item.destination_dir.to_string_lossy().to_string(),
                 message: format!("{} | {}", e, e.kind()),
@@ -193,14 +203,19 @@ where
         };
         bytes_written += chunks.len();
         if Instant::now().duration_since(last_update_time) > progress_update_interval {
-            (on_update)(ProgressUpdate(Progress {
+            if let Err(e) = update_tx.try_send(ProgressUpdate(Progress {
                 bytes_written: bytes_written as u64,
                 file_size: f_size,
                 resource_name: f_name.to_owned(),
                 session_id: session_id.to_owned(),
-            }))
-            .await;
-            last_update_time = Instant::now();
+            })) {
+                match e {
+                    TrySendError::Closed(_) => return Err(WscError::ChannelClosed),
+                    _ => {}
+                }
+            } else {
+                last_update_time = Instant::now();
+            };
         }
     }
     // destination_dir has been updated previously to point to the destination file
@@ -209,12 +224,19 @@ where
         &dld_item.link,
         dld_item.destination_dir.to_str().unwrap()
     );
-    (on_update)(ProgressUpdate(Progress {
-        bytes_written: bytes_written as u64,
-        file_size: f_size,
-        resource_name: f_name,
-        session_id,
-    }));
+    if let Err(_) = update_tx
+        .send(ProgressUpdate(Progress {
+            bytes_written: bytes_written as u64,
+            file_size: if f_size == 0 {
+                bytes_written as u64
+            } else {
+                f_size
+            },
+            resource_name: f_name,
+            session_id,
+        }))
+        .await
+    {};
     Ok(Some(dld_item.destination_dir.to_string_lossy().to_string()))
 }
 
