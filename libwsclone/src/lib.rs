@@ -3,10 +3,10 @@ use crate::errors::WscError;
 use crate::link::{get_anchor_links, get_static_resource_links};
 use crate::session::Session;
 use reqwest::Client;
-use std::future::Future;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
+use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tokio::{fs, spawn};
@@ -66,16 +66,13 @@ struct DownloadProp {
 }
 
 #[instrument]
-pub async fn init_download<F>(
+pub async fn init_download(
     session_id: &str,
     link: &str,
     dest_dir: &str,
     mut rule: DownloadRule,
-    on_update: fn(Update) -> F,
-) -> Result<(), WscError>
-where
-    F: Future + Send + 'static,
-{
+    update_tx: Sender<Update>,
+) -> Result<(), WscError> {
     if let Err(e) = fs::create_dir_all(dest_dir).await {
         tracing::error!("Failed to create destination directory");
         tracing::error!("{}", e);
@@ -94,7 +91,7 @@ where
     }));
 
     let mut a_href_links: Vec<(String, Url)> = match download_page_with_static_resources(
-        on_update,
+        update_tx.clone(),
         rule.max_level - 1 > 0,
         link,
         &Url::parse(link).unwrap(),
@@ -131,7 +128,7 @@ where
         let mut new_pages: Vec<(String, Url)> = Vec::new();
         for (raw_link, pg_url) in a_href_links.iter() {
             if let Some(mut pages) = download_page_with_static_resources(
-                on_update,
+                update_tx.clone(),
                 more_pages,
                 raw_link,
                 pg_url,
@@ -171,20 +168,16 @@ where
     for (_, page_f_loc) in session_lock.read().await.processed_pages.iter() {
         link_page_to_static_resources(page_f_loc, &raw_links, &res_f_loc).await?;
     }
-
     Ok(())
 }
 
-async fn download_page_with_static_resources<F>(
-    on_update: fn(Update) -> F,
+async fn download_page_with_static_resources(
+    update_tx: Sender<Update>,
     more_pages: bool,
     raw_link: &str,
     pg_url: &Url,
     prop: DownloadProp,
-) -> Result<Option<Vec<(String, Url)>>, WscError>
-where
-    F: Future + Send + 'static,
-{
+) -> Result<Option<Vec<(String, Url)>>, WscError> {
     let mut pages: Option<Vec<(String, Url)>> = None;
 
     match download_file(
@@ -195,7 +188,7 @@ where
         },
         &prop.client,
         &prop.rule,
-        on_update,
+        update_tx.clone(),
         prop.file_name.clone(),
     )
     .await
@@ -236,8 +229,12 @@ where
                     {
                         continue;
                     }
-                    let task =
-                        download_static_resource(on_update, raw_link, parsed_link, prop.clone());
+                    let task = download_static_resource(
+                        update_tx.clone(),
+                        raw_link,
+                        parsed_link,
+                        prop.clone(),
+                    );
                     dld_tasks.push(task);
                 }
 
@@ -343,15 +340,12 @@ async fn link_page_to_static_resources(
     Ok(())
 }
 
-fn download_static_resource<F>(
-    on_update: fn(Update) -> F,
+fn download_static_resource(
+    update_tx: Sender<Update>,
     raw_link: String,
     parsed_link: Url,
     mut prop: DownloadProp,
-) -> JoinHandle<Option<WscError>>
-where
-    F: Future + Send + 'static,
-{
+) -> JoinHandle<Option<WscError>> {
     prop.file_name = None;
     spawn(async move {
         return match download_file(
@@ -362,7 +356,7 @@ where
             },
             &prop.client,
             &prop.rule,
-            on_update,
+            update_tx,
             None,
         )
         .await
