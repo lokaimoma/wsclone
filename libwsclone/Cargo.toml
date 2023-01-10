@@ -1,0 +1,19 @@
+[package]
+name = "libwsclone"
+version = "0.1.0"
+edition = "2021"
+authors = ["Owusu Kelvin Clark"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aho-corasick = "0.7.20"
+chrono = "0.4.23"
+futures = "0.3.25"
+lazy_static = "1.4.0"
+phf = { version = "0.11.1", features = ["macros"] }
+reqwest = { version = "0.11.13", features = []}
+scraper = "0.14.0"
+tokio = {version = "1.23.0", features = ["time", "fs", "io-util", "macros", "rt-multi-thread"]}
+tracing = "0.1.37"
+url = "2.3.1"
