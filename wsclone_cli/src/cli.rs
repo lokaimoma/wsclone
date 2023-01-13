@@ -82,7 +82,7 @@ pub async fn download(cli: Cli) {
             }
             Update::ProgressUpdate(progress) => {
                 if let Some(pb) = pb_files.get(&progress.resource_name) {
-                    pb.inc(progress.bytes_written);
+                    pb.inc(progress.bytes_written - pb.length());
                 } else {
                     let sty = ProgressStyle::with_template(
                         "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
