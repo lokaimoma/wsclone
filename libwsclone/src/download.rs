@@ -23,6 +23,7 @@ pub struct DownloadItem {
 }
 
 /// Takes care of downloading a file. The returned optional string is the path to the downloaded file
+#[tracing::instrument]
 pub async fn download_file(
     session_id: String,
     mut dld_item: DownloadItem,
@@ -40,6 +41,7 @@ pub async fn download_file(
     drop(link_str);
 
     if !dld_item.destination_dir.exists() {
+        tracing::error!("Destination directory does not exist. Aborting...");
         return Err(WscError::DestinationDirectoryDoesNotExist(
             dld_item.destination_dir.to_string_lossy().to_string(),
         ));
@@ -118,14 +120,15 @@ pub async fn download_file(
                 dld_item.destination_dir.to_str().unwrap()
             );
             tracing::error!("{} | {}", e, e.kind());
-            if let Err(_) = update_tx
+            if (update_tx
                 .send(MessageUpdate(Message {
                     session_id,
                     resource_name: f_name,
                     is_error: true,
                     content: "Error opening destination file".into(),
                 }))
-                .await
+                .await)
+                .is_err()
             {};
             return Err(WscError::FileOperationError {
                 file_name: dld_item.destination_dir.to_string_lossy().to_string(),
@@ -190,14 +193,15 @@ pub async fn download_file(
                 return Err(WscError::NetworkError(e.to_string()));
             } else if e.is_status() {
                 let status = e.status().unwrap();
-                if let Err(_) = update_tx
+                if (update_tx
                     .send(MessageUpdate(Message {
                         session_id,
                         resource_name: f_name,
                         is_error: true,
                         content: format!("Error status code : {}", status),
                     }))
-                    .await
+                    .await)
+                    .is_err()
                 {};
                 if rule.abort_on_download_error {
                     return Err(WscError::ErrorStatusCode {
@@ -216,14 +220,15 @@ pub async fn download_file(
                 dld_item.destination_dir.to_str().unwrap()
             );
             tracing::error!("{} | {}", e, e.kind());
-            if let Err(_) = update_tx
+            if (update_tx
                 .send(MessageUpdate(Message {
                     session_id,
                     resource_name: f_name,
                     is_error: true,
                     content: "Error writing to file".into(),
                 }))
-                .await
+                .await)
+                .is_err()
             {};
             return Err(WscError::FileOperationError {
                 file_name: dld_item.destination_dir.to_string_lossy().to_string(),
@@ -269,6 +274,7 @@ pub async fn download_file(
     Ok(Some(dld_item.destination_dir.to_string_lossy().to_string()))
 }
 
+#[tracing::instrument]
 fn get_file_name(dld_item: &DownloadItem, headers: &HeaderMap, f_ext: &str) -> String {
     let mut file_name = dld_item.link.to_string();
     if file_name.contains('?') {
@@ -316,6 +322,7 @@ fn get_file_name(dld_item: &DownloadItem, headers: &HeaderMap, f_ext: &str) -> S
     file_name
 }
 
+#[tracing::instrument]
 fn get_file_extension<'a>(dld_item: &'a DownloadItem, headers: &HeaderMap) -> &'a str {
     match headers.get(header::CONTENT_TYPE) {
         None => {
