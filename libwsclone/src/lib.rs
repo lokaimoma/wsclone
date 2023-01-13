@@ -203,13 +203,27 @@ async fn download_page_with_static_resources(
                     .processed_pages
                     .insert(raw_link.to_string(), page_f_path.to_string());
                 let static_res_links = match fs::read_to_string(&page_f_path).await {
-                    ///
+                    // This might mostly be a UTF-8 error and rarely a read operation error
+                    // We only abort if it's the initial page.
                     Err(e) => {
                         tracing::error!("Error reading file {}\nError : {}", page_f_path, e);
-                        return Err(WscError::FileOperationError {
-                            file_name: page_f_path,
-                            message: format!("{} | {}", e, e.kind()),
-                        });
+                        update_tx
+                            .send(Update::MessageUpdate(Message {
+                                session_id: prop.session_id.clone(),
+                                content: format!("Error reading file for resource links. {}", e),
+                                resource_name: "".to_string(),
+                                is_error: false,
+                            }))
+                            .await
+                            .unwrap();
+                        // This is valid for only the initial page
+                        if prop.file_name.is_some() {
+                            return Err(WscError::FileOperationError {
+                                file_name: page_f_path,
+                                message: format!("{} | {}", e, e.kind()),
+                            });
+                        }
+                        Vec::new()
                     }
                     Ok(html) => {
                         if more_pages {
