@@ -149,7 +149,20 @@ pub async fn download_file(
         return Ok(None);
     }
 
-    if f_size != 0 && dest_file.metadata().await.unwrap().len() >= f_size {
+    let dest_f_size = match dest_file.metadata().await {
+        Ok(m) => m.len(),
+        Err(e) => {
+            tracing::debug!(
+                "Error getting file size for {} @ {}\nError : {}",
+                dld_item.destination_dir.to_string_lossy().to_string(),
+                dld_item.link.to_string(),
+                e
+            );
+            0
+        }
+    };
+
+    if dest_f_size > 0 && f_size != 0 && dest_file.metadata().await.unwrap().len() >= f_size {
         let f_name = dld_item.destination_dir.to_string_lossy().to_string();
         tracing::debug!(
             "File : |{}| from |{}| has already been downloaded.",
@@ -172,6 +185,7 @@ pub async fn download_file(
     let progress_update_interval = Duration::from_millis(rule.progress_update_interval);
     let mut last_update_time = Instant::now() - progress_update_interval;
     let mut bytes_written = 0;
+
     while let Some(chunks) = match response.chunk().await {
         Err(e) => {
             tracing::error!(

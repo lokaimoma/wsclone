@@ -171,6 +171,7 @@ pub async fn init_download(
     Ok(())
 }
 
+#[tracing::instrument]
 async fn download_page_with_static_resources(
     update_tx: Sender<Update>,
     more_pages: bool,
@@ -203,6 +204,7 @@ async fn download_page_with_static_resources(
                     .processed_pages
                     .insert(raw_link.to_string(), page_f_path.to_string());
                 let static_res_links = match fs::read_to_string(&page_f_path).await {
+                    ///
                     Err(e) => {
                         tracing::error!("Error reading file {}", page_f_path);
                         tracing::error!("{}", e);
