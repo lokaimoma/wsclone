@@ -41,7 +41,7 @@ pub struct Cli {
 }
 
 pub async fn download(cli: Cli) {
-    log::info!("Initializing download....");
+    println!("Initializing download....");
     let mut pb_files: HashMap<String, ProgressBar> = HashMap::new();
     let (tx, mut rx) = channel::<Update>(MAX_BUFFER_SIZE);
     tokio::spawn(async move {
@@ -64,40 +64,36 @@ pub async fn download(cli: Cli) {
         .await
         {
             Ok(_) => {
-                log::info!(
+                println!(
                     "Webpage(s) downloaded successfully. {}",
                     cli.output_directory
                 );
             }
             Err(e) => {
-                log::error!("Download wasn't able to complete");
-                log::error!("{}", e);
+                println!("Download wasn't able to complete");
+                println!("{}", e);
             }
         }
     });
     while let Some(update) = rx.recv().await {
         match update {
             Update::MessageUpdate(msg) => {
-                if msg.is_error {
-                    log::error!("{} | {}", msg.content, msg.resource_name);
-                } else {
-                    log::info!("{} | {}", msg.content, msg.resource_name);
-                }
+                println!("{} | {}", msg.content, msg.resource_name);
             }
-            Update::ProgressUpdate(prog) => {
-                if let Some(pb) = pb_files.get(&prog.resource_name) {
-                    pb.inc(prog.bytes_written);
+            Update::ProgressUpdate(progress) => {
+                if let Some(pb) = pb_files.get(&progress.resource_name) {
+                    pb.inc(progress.bytes_written);
                 } else {
                     let sty = ProgressStyle::with_template(
                         "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
                     )
                     .unwrap()
                     .progress_chars("##-");
-                    let pb = ProgressBar::new(prog.file_size);
+                    let pb = ProgressBar::new(progress.file_size);
                     pb.set_style(sty);
                     pb.tick();
-                    pb.set_message(prog.resource_name.clone());
-                    pb_files.insert(prog.resource_name, pb);
+                    pb.set_message(progress.resource_name.clone());
+                    pb_files.insert(progress.resource_name, pb);
                 }
             }
         };
