@@ -74,8 +74,7 @@ pub async fn init_download(
     update_tx: Sender<Update>,
 ) -> Result<(), WscError> {
     if let Err(e) = fs::create_dir_all(dest_dir).await {
-        tracing::error!("Failed to create destination directory");
-        tracing::error!("{}", e);
+        tracing::error!("Failed to create destination directory\nError : {}", e);
         return Err(WscError::ErrorCreatingDestinationDirectory(e.to_string()));
     };
 
@@ -206,8 +205,7 @@ async fn download_page_with_static_resources(
                 let static_res_links = match fs::read_to_string(&page_f_path).await {
                     ///
                     Err(e) => {
-                        tracing::error!("Error reading file {}", page_f_path);
-                        tracing::error!("{}", e);
+                        tracing::error!("Error reading file {}\nError : {}", page_f_path, e);
                         return Err(WscError::FileOperationError {
                             file_name: page_f_path,
                             message: format!("{} | {}", e, e.kind()),
@@ -257,14 +255,12 @@ async fn download_page_with_static_resources(
                                 {
                                     return Err(err);
                                 } else {
-                                    tracing::warn!("An error occurred but not network error. Continuing download...");
-                                    tracing::error!("{:?}", err);
+                                    tracing::warn!("An error occurred but not network error. Continuing download...\nError : {}", err);
                                 }
                             }
                         }
                         Err(e) => {
-                            tracing::error!("Download thread panicked");
-                            tracing::error!("{}", e);
+                            tracing::error!("Download thread panicked\nError : {}", e);
                             return Err(WscError::UnknownError(e.to_string()));
                         }
                     }
@@ -284,8 +280,12 @@ async fn link_page_to_static_resources(
     let html_string = match fs::read_to_string(&page_file_path).await {
         Ok(s) => s,
         Err(e) => {
-            tracing::error!("Error reading file {}", page_file_path);
-            tracing::error!("{} | {}", e, e.kind());
+            tracing::error!(
+                "Error reading file {}\nError : {} | {}",
+                page_file_path,
+                e,
+                e.kind()
+            );
             return Err(WscError::FileOperationError {
                 file_name: page_file_path.into(),
                 message: format!("{} | {}", e, e.kind()),
@@ -299,18 +299,11 @@ async fn link_page_to_static_resources(
 
     let ac = aho_corasick::AhoCorasick::new(raw_links);
 
-    tracing::info!("Replacing links with file path in {}", page_file_path);
-
     if let Err(e) = ac.stream_replace_all(html_string_bytes, &mut final_html_bytes, res_f_loc) {
         // Shouldn't happen though
         tracing::error!("AHOCORASICK ERROR : {}", e);
         return Err(WscError::UnknownError(e.to_string()));
     };
-
-    tracing::debug!(
-        "Bytes returned after replacement : {}",
-        final_html_bytes.len()
-    );
 
     let mut file = match fs::OpenOptions::new()
         .create(true)
@@ -321,8 +314,12 @@ async fn link_page_to_static_resources(
     {
         Ok(f) => f,
         Err(e) => {
-            tracing::error!("Error opening file : {}", page_file_path);
-            tracing::error!("{} | {}", e, e.kind());
+            tracing::error!(
+                "Error opening file : {}\nError : {} | {}",
+                page_file_path,
+                e,
+                e.kind()
+            );
             return Err(WscError::FileOperationError {
                 file_name: page_file_path.into(),
                 message: format!("{} | {}", e, e.kind()),
@@ -331,8 +328,7 @@ async fn link_page_to_static_resources(
     };
 
     if let Err(e) = file.write_all(&final_html_bytes).await {
-        tracing::error!("Error writing to file : {}", page_file_path);
-        tracing::error!("{}", e);
+        tracing::error!("Error writing to file : {}\nError : {}", page_file_path, e);
         return Err(WscError::FileOperationError {
             file_name: page_file_path.into(),
             message: format!("{} | {}", e, e.kind()),

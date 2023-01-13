@@ -49,8 +49,11 @@ pub async fn download_file(
 
     let mut response = match client.get(dld_item.link.to_string()).send().await {
         Err(e) => {
-            tracing::error!("Error downloading file from {}", dld_item.link.to_string());
-            tracing::error!("{}", e);
+            tracing::error!(
+                "Error downloading file from {}\nError : {}",
+                dld_item.link.to_string(),
+                e
+            );
             // File name is always passed for first page.
             // If it's the first page, then we want to
             // abort the whole download irrespective of
@@ -116,10 +119,11 @@ pub async fn download_file(
     {
         Err(e) => {
             tracing::error!(
-                "Error opening/creating file {}",
-                dld_item.destination_dir.to_str().unwrap()
+                "Error opening/creating file {}\nError : {} | {}",
+                dld_item.destination_dir.to_str().unwrap(),
+                e,
+                e.kind()
             );
-            tracing::error!("{} | {}", e, e.kind());
             if (update_tx
                 .send(MessageUpdate(Message {
                     session_id,
@@ -189,10 +193,10 @@ pub async fn download_file(
     while let Some(chunks) = match response.chunk().await {
         Err(e) => {
             tracing::error!(
-                "Error downloading resource from {}",
-                dld_item.link.to_string()
+                "Error downloading resource from {}\nError : {}",
+                dld_item.link.to_string(),
+                e
             );
-            tracing::error!("{}", e);
             if e.is_connect() {
                 if (update_tx
                     .send(MessageUpdate(Message {
@@ -230,10 +234,11 @@ pub async fn download_file(
     } {
         if let Err(e) = dest_file.write_all(&chunks).await {
             tracing::error!(
-                "Error writing to destination file {}",
-                dld_item.destination_dir.to_str().unwrap()
+                "Error writing to destination file {}\nError : {} | {}",
+                dld_item.destination_dir.to_str().unwrap(),
+                e,
+                e.kind()
             );
-            tracing::error!("{} | {}", e, e.kind());
             if (update_tx
                 .send(MessageUpdate(Message {
                     session_id,
