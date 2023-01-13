@@ -73,6 +73,12 @@ pub async fn init_download(
     mut rule: DownloadRule,
     update_tx: Sender<Update>,
 ) -> Result<(), WscError> {
+    let initial_url = if let Ok(u) = Url::parse(link) {
+        u
+    } else {
+        return Err(WscError::InvalidUrl(link.to_string()));
+    };
+
     if let Err(e) = fs::create_dir_all(dest_dir).await {
         tracing::error!("Failed to create destination directory\nError : {}", e);
         return Err(WscError::ErrorCreatingDestinationDirectory(e.to_string()));
@@ -84,6 +90,7 @@ pub async fn init_download(
         ).build().unwrap());
 
     let session_lock = Arc::new(RwLock::new(Session {
+        initial_url,
         session_id: session_id.to_string(),
         processed_static_files: Default::default(),
         processed_pages: Default::default(),
@@ -178,6 +185,15 @@ async fn download_page_with_static_resources(
     pg_url: &Url,
     prop: DownloadProp,
 ) -> Result<Option<Vec<(String, Url)>>, WscError> {
+    // Check if current page and initial page belong to the same host.
+    if let Some(init_pg_host) = prop.session.read().await.initial_url.host() {
+        if let Some(host) = pg_url.host() {
+            if init_pg_host.to_string() != host.to_string() {
+                return Ok(None);
+            }
+        }
+    }
+
     let mut pages: Option<Vec<(String, Url)>> = None;
 
     match download_file(

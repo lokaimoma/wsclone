@@ -18,6 +18,7 @@ pub enum WscError {
         url: String,
     },
     ChannelClosed,
+    InvalidUrl(String),
 }
 
 impl std::fmt::Display for WscError {
