@@ -43,7 +43,8 @@ impl std::fmt::Display for WscError {
                 "server returned an error response. {} => {}",
                 url, status_code
             ),
-            WscError::ChannelClosed => format!("Channel closed before download completion"),
+            WscError::ChannelClosed => "Channel closed before download completion".to_string(),
+            WscError::InvalidUrl(url) => format!("Invalid url received : {}", url),
         };
         write!(f, "{}", str)
     }

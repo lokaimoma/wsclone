@@ -38,7 +38,6 @@ pub async fn download_file(
             return Ok(None);
         }
     }
-    drop(link_str);
 
     if !dld_item.destination_dir.exists() {
         tracing::error!("Destination directory does not exist. Aborting...");
