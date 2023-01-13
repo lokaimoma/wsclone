@@ -239,7 +239,7 @@ async fn download_page_with_static_resources(
                                 message: format!("{} | {}", e, e.kind()),
                             });
                         }
-                        Vec::new()
+                        return Ok(None);
                     }
                     Ok(html) => {
                         if more_pages {
