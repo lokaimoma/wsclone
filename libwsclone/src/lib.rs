@@ -18,8 +18,6 @@ mod errors;
 mod link;
 mod session;
 
-const MAX_SLEEP_SECONDS: u8 = 3;
-
 #[derive(Debug, Clone)]
 pub struct DownloadRule {
     /// Maximum size for static files to download
