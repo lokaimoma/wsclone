@@ -28,7 +28,8 @@ fn get_full_link(link: &str, page_url: &Url) -> Option<Url> {
 
 /// Gets all valid anchor tag links. Each tuple,
 /// has as first element, the link found in the page and the second
-/// element is a parsed URL object of that link.
+/// element is a parsed URL object of that link in relation with the
+// /// current page's url.
 /// E.g (/hello.html, https://www.example.com/hello.html as a Url object)  
 pub fn get_anchor_links(html_string: &str, page_url: Url) -> HashSet<(String, Url)> {
     let html_document = Html::parse_document(html_string);
@@ -60,9 +61,10 @@ pub fn get_anchor_links(html_string: &str, page_url: Url) -> HashSet<(String, Ur
         .collect::<_>()
 }
 
-/// Gets all valid anchor css and javascript file links. Each tuple,
+/// Gets all valid static web resource file links. Each tuple,
 /// has as first element, the link found in the page and the second
-/// element is a parsed URL object of that link.
+/// element is a parsed URL object of that link in relation with the
+/// current page's url.
 /// E.g (/hello.js, https://www.example.com/hello.js as a Url object)
 pub fn get_static_resource_links(html_string: &str, page_url: Url) -> HashSet<(String, Url)> {
     let html_document = Html::parse_document(html_string);
