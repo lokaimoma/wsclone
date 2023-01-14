@@ -5,6 +5,7 @@ use chrono::Utc;
 use reqwest::header::HeaderMap;
 use reqwest::{header, Client};
 
+use phf::phf_map;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -373,21 +374,25 @@ fn get_file_extension<'a>(dld_item: &'a DownloadItem, headers: &HeaderMap) -> &'
 }
 
 static MIME_TYPES: phf::Map<&'static str, &str> = phf_map! {
-    "text/html" => ".html",
-    "image/jpeg" => ".jpg",
-    "text/javascript" => ".js",
     "application/json" => ".json",
-    "audio/mpeg" => ".mp3",
-    "video/mp4" => ".mp4",
-    "video/mpeg" => ".mpeg",
-    "audio/ogg" => ".oga",
-    "video/ogg" => ".ogv",
-    "font/otf" => ".otf",
-    "image/png" => ".png",
+    "application/javascript" => ".js",
     "application/pdf" => ".pdf",
     "application/vnd.ms-powerpoint" => ".ppt",
     "application/xhtml+xml" => ".xhtml",
-    "text/css" => ".css",
+    "audio/mpeg" => ".mp3",
+    "audio/ogg" => ".oga",
+    "audio/webm" => ".webm",
+    "image/jpeg" => ".jpg",
+    "image/png" => ".png",
     "image/gif" => ".gif",
-    "application/javascript" => ".js"
+    "image/webp" => ".webp",
+    "text/html" => ".html",
+    "text/javascript" => ".js",
+    "video/mp4" => ".mp4",
+    "video/mpeg" => ".mpeg",
+    "video/ogg" => ".ogv",
+    "video/webm" => ".webm",
+    "font/otf" => ".otf",
+    "text/css" => ".css",
+
 };
