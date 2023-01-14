@@ -337,6 +337,9 @@ fn get_file_name(dld_item: &DownloadItem, headers: &HeaderMap, f_ext: &str) -> S
             }
         }
     }
+    if !file_name.contains(f_ext) {
+        file_name = format!("{}{}", file_name, f_ext);
+    }
     file_name
 }
 

@@ -178,6 +178,7 @@ pub async fn init_download(
     for (_, page_f_loc) in session_lock.read().await.processed_pages.iter() {
         link_page_to_static_resources(page_f_loc, &raw_links, &res_f_loc).await?;
     }
+    tracing::debug!("Session completed");
     Ok(())
 }
 
