@@ -193,6 +193,7 @@ async fn download_page_with_static_resources(
     if let Some(init_pg_host) = prop.session.read().await.initial_url.host() {
         if let Some(host) = pg_url.host() {
             if init_pg_host.to_string() != host.to_string() {
+                tracing::debug!("Skipping {}", pg_url.to_string());
                 return Ok(None);
             }
         }

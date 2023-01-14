@@ -1,4 +1,4 @@
-use https://en.wikipedia.org/wiki/Osbert_Parsleycrate::cli::download;
+use crate::cli::download;
 use clap::Parser;
 use std::path::MAIN_SEPARATOR;
 

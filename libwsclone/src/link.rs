@@ -49,7 +49,6 @@ pub fn get_anchor_links(html_string: &str, page_url: Url) -> Vec<(String, Url)> 
 /// tuples, has as first element, the link found in the page and the second
 /// element is a parsed URL object of that link.
 /// E.g (/hello.js, https://www.example.com/hello.js as a Url object)
-#[tracing::instrument]
 pub fn get_static_resource_links(html_string: &str, page_url: Url) -> Vec<(String, Url)> {
     let html_document = Html::parse_document(html_string);
     let css_tag_selector = Selector::parse(r#"link[href][rel="stylesheet"]"#).unwrap();

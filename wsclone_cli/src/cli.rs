@@ -3,6 +3,7 @@ use clap::Parser;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use libwsclone::{init_download, DownloadRule, Update};
 use std::collections::HashMap;
+use std::num::Wrapping;
 use tokio::sync::mpsc::channel;
 use url::Url;
 
@@ -44,6 +45,7 @@ pub async fn download(cli: Cli) {
     println!("Initializing download....");
     let mp = MultiProgress::new();
     let mut pb_files: HashMap<String, ProgressBar> = HashMap::new();
+    let mp_clone = mp.clone();
     let (tx, mut rx) = channel::<Update>(MAX_BUFFER_SIZE);
     tokio::spawn(async move {
         match init_download(
@@ -65,14 +67,20 @@ pub async fn download(cli: Cli) {
         .await
         {
             Ok(_) => {
-                println!(
-                    "Webpage(s) downloaded successfully. {}",
-                    cli.output_directory
-                );
+                mp_clone.clear().unwrap();
+                mp_clone
+                    .println(format!(
+                        "Webpage(s) downloaded successfully. {}",
+                        cli.output_directory
+                    ))
+                    .unwrap();
             }
             Err(e) => {
-                println!("Download wasn't able to complete");
-                println!("{}", e);
+                mp_clone.clear().unwrap();
+                mp_clone
+                    .println("Download wasn't able to complete")
+                    .unwrap();
+                mp_clone.println(format!("{}", e)).unwrap();
             }
         }
     });
@@ -83,7 +91,7 @@ pub async fn download(cli: Cli) {
             }
             Update::ProgressUpdate(progress) => {
                 if let Some(pb) = pb_files.get(&progress.resource_name) {
-                    pb.inc(progress.bytes_written - pb.length());
+                    pb.inc((Wrapping(progress.bytes_written) - Wrapping(pb.position())).0);
                 } else {
                     let sty = ProgressStyle::with_template(
                         "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
