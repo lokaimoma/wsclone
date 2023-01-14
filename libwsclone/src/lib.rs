@@ -251,6 +251,7 @@ async fn download_page_with_static_resources(
                     }
                     Ok(html) => {
                         let dest_dir = &prop.dest_dir;
+                        let session = prop.session.read().await;
                         if more_pages {
                             // If a page has already been downloaded and all links replaced, the
                             // links to the static resources will point to their local files. Which
@@ -258,27 +259,24 @@ async fn download_page_with_static_resources(
                             pages = Some(
                                 get_anchor_links(&html, pg_url.to_owned())
                                     .into_iter()
-                                    .filter(|(raw_link, _)| !raw_link.contains(dest_dir))
+                                    .filter(|(raw_link, _)| {
+                                        !raw_link.contains(dest_dir)
+                                            && !session.processed_pages.contains_key(raw_link)
+                                    })
                                     .collect(),
                             );
                         }
                         get_static_resource_links(&html, pg_url.to_owned())
                             .into_iter()
-                            .filter(|(raw_link, _)| !raw_link.contains(dest_dir))
+                            .filter(|(raw_link, _)| {
+                                !raw_link.contains(dest_dir)
+                                    && !session.processed_static_files.contains_key(raw_link)
+                            })
                             .collect()
                     }
                 };
                 let mut dld_tasks: Vec<JoinHandle<Option<WscError>>> = Vec::new();
                 for (raw_link, parsed_link) in static_res_links {
-                    if prop
-                        .session
-                        .read()
-                        .await
-                        .processed_static_files
-                        .contains_key(&raw_link)
-                    {
-                        continue;
-                    }
                     let task = download_static_resource(
                         update_tx.clone(),
                         raw_link,
