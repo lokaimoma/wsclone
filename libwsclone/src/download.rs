@@ -101,7 +101,7 @@ pub async fn download_file(
             f_ext
         );
 
-        f_name = get_file_name(&dld_item, headers, &f_ext);
+        f_name = get_file_name(&dld_item, headers, f_ext);
         tracing::debug!("File name for {} is {}", dld_item.link.to_string(), &f_name);
     } else {
         f_name = file_name.unwrap();
@@ -343,14 +343,14 @@ fn get_file_name(dld_item: &DownloadItem, headers: &HeaderMap, f_ext: &str) -> S
 }
 
 #[tracing::instrument]
-fn get_file_extension(dld_item: &DownloadItem, headers: &HeaderMap) -> String {
+fn get_file_extension<'a>(dld_item: &'a DownloadItem, headers: &HeaderMap) -> &'a str {
     match headers.get(header::CONTENT_TYPE) {
         None => {
             tracing::warn!(
                 "File extension can not be determined for {}",
                 dld_item.link.to_string()
             );
-            "".to_string()
+            ""
         }
         Some(ct) => {
             let mut val = ct.to_str().unwrap().to_lowercase();
@@ -358,23 +358,36 @@ fn get_file_extension(dld_item: &DownloadItem, headers: &HeaderMap) -> String {
             if val.contains(';') {
                 val = val[0..val.find(';').unwrap()].parse().unwrap();
             }
-            match val.parse::<mime::Mime>() {
-                Err(e) => {
-                    tracing::error!("{} not in mime crate.\nError {}", val, e);
+            match MIME_TYPES.get(&val) {
+                None => {
                     tracing::warn!(
                         "File extension can not be determined for {}",
                         dld_item.link.to_string()
                     );
-                    "".to_string()
+                    ""
                 }
-                Ok(mime) => match mime.suffix() {
-                    None => {
-                        tracing::warn!("No suffix for {} from mime crate", val);
-                        "".to_string()
-                    }
-                    Some(suffix) => format!(".{}", suffix),
-                },
+                Some(ext) => ext,
             }
         }
     }
 }
+
+static MIME_TYPES: phf::Map<&'static str, &str> = phf_map! {
+    "text/html" => ".html",
+    "image/jpeg" => ".jpg",
+    "text/javascript" => ".js",
+    "application/json" => ".json",
+    "audio/mpeg" => ".mp3",
+    "video/mp4" => ".mp4",
+    "video/mpeg" => ".mpeg",
+    "audio/ogg" => ".oga",
+    "video/ogg" => ".ogv",
+    "font/otf" => ".otf",
+    "image/png" => ".png",
+    "application/pdf" => ".pdf",
+    "application/vnd.ms-powerpoint" => ".ppt",
+    "application/xhtml+xml" => ".xhtml",
+    "text/css" => ".css",
+    "image/gif" => ".gif",
+    "application/javascript" => ".js"
+};
