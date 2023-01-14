@@ -166,7 +166,7 @@ pub async fn download_file(
     };
 
     if dest_f_size > 0 && f_size != 0 && dest_file.metadata().await.unwrap().len() >= f_size {
-        let f_name = dld_item.destination_dir.to_string_lossy().to_string();
+        let f_path = dld_item.destination_dir.to_string_lossy().to_string();
         tracing::debug!(
             "File : |{}| from |{}| has already been downloaded.",
             f_name,
@@ -182,7 +182,7 @@ pub async fn download_file(
             .await)
             .is_err()
         {};
-        return Ok(Some(f_name));
+        return Ok(Some(f_path));
     }
 
     let progress_update_interval = Duration::from_millis(rule.progress_update_interval);

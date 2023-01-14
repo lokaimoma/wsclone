@@ -1,9 +1,6 @@
 use chrono::Utc;
 use clap::Parser;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use libwsclone::{init_download, DownloadRule, Update};
-use std::collections::HashMap;
-use std::num::Wrapping;
 use tokio::sync::mpsc::channel;
 use url::Url;
 
@@ -43,9 +40,6 @@ pub struct Cli {
 
 pub async fn download(cli: Cli) {
     println!("Initializing download....");
-    let mp = MultiProgress::new();
-    let mut pb_files: HashMap<String, ProgressBar> = HashMap::new();
-    let mp_clone = mp.clone();
     let (tx, mut rx) = channel::<Update>(MAX_BUFFER_SIZE);
     tokio::spawn(async move {
         match init_download(
@@ -67,18 +61,14 @@ pub async fn download(cli: Cli) {
         .await
         {
             Ok(_) => {
-                mp_clone
-                    .println(format!(
-                        "Webpage(s) downloaded successfully. {}",
-                        cli.output_directory
-                    ))
-                    .unwrap();
+                println!(
+                    "Webpage(s) downloaded successfully. {}",
+                    cli.output_directory
+                );
             }
             Err(e) => {
-                mp_clone
-                    .println("Download wasn't able to complete")
-                    .unwrap();
-                mp_clone.println(format!("{}", e)).unwrap();
+                println!("Download wasn't able to complete");
+                println!("{}", e);
             }
         }
     });
@@ -88,19 +78,11 @@ pub async fn download(cli: Cli) {
                 println!("{} | {}", msg.content, msg.resource_name);
             }
             Update::ProgressUpdate(progress) => {
-                if let Some(pb) = pb_files.get(&progress.resource_name) {
-                    pb.inc((Wrapping(progress.bytes_written) - Wrapping(pb.position())).0);
-                } else {
-                    let sty = ProgressStyle::with_template(
-                        "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+                if progress.bytes_written >= progress.file_size {
+                    println!(
+                        "[Downloaded] {} {} bytes",
+                        progress.resource_name, progress.file_size
                     )
-                    .unwrap()
-                    .progress_chars("##-");
-                    let pb = mp.add(ProgressBar::new(progress.file_size));
-                    pb.set_style(sty);
-                    pb.tick();
-                    pb.set_message(progress.resource_name.clone());
-                    pb_files.insert(progress.resource_name, pb);
                 }
             }
         };
