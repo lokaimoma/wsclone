@@ -75,12 +75,17 @@ pub async fn download(cli: Cli) {
     while let Some(update) = rx.recv().await {
         match update {
             Update::MessageUpdate(msg) => {
-                println!("{} | {}", msg.content, msg.resource_name);
+                println!(
+                    "{}{} | {}",
+                    if msg.is_error { "[ERROR] " } else { "[INFO]" },
+                    msg.content,
+                    msg.resource_name
+                );
             }
             Update::ProgressUpdate(progress) => {
                 if progress.bytes_written >= progress.file_size {
                     println!(
-                        "[Downloaded] {} {} bytes",
+                        "[DOWNLOADED] {} {} bytes",
                         progress.resource_name, progress.file_size
                     )
                 }
