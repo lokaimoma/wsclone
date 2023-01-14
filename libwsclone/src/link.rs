@@ -33,9 +33,9 @@ fn get_full_link(link: &str, page_url: &Url) -> Option<Url> {
 pub fn get_anchor_links(html_string: &str, page_url: Url) -> HashSet<(String, Url)> {
     let html_document = Html::parse_document(html_string);
     let anchor_tag_selector = Selector::parse(
-        r###"
-        a[href]:not([download]):not([href="javascript:void(0)"]):not([href^="#"]):not([href~="#"])
-        "###,
+        r##"
+        a[href]:not([download]):not([href="javascript:void(0)"]):not([href*="#"])
+        "##,
     )
     .unwrap();
     html_document
@@ -68,9 +68,12 @@ pub fn get_static_resource_links(html_string: &str, page_url: Url) -> HashSet<(S
     let html_document = Html::parse_document(html_string);
     let css_tag_selector = Selector::parse(r#"link[href][rel="stylesheet"]"#).unwrap();
     let js_tag_selector = Selector::parse("script[src]").unwrap();
+    let img_tag_selector =
+        Selector::parse(r###"img[src]:not([src^="data"]):not([src^="blob"])"###).unwrap();
     html_document
         .select(&css_tag_selector)
         .chain(html_document.select(&js_tag_selector))
+        .chain(html_document.select(&img_tag_selector))
         .map(|element| {
             return if let Some(href) = element.value().attr("href") {
                 href
