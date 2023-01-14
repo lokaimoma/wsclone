@@ -190,6 +190,15 @@ async fn download_page_with_static_resources(
     pg_url: &Url,
     prop: DownloadProp,
 ) -> Result<Option<Vec<(String, Url)>>, WscError> {
+    if prop
+        .session
+        .read()
+        .await
+        .processed_pages
+        .contains_key(raw_link)
+    {
+        return Ok(None);
+    }
     // Check if current page and initial page belong to the same host.
     if let Some(initial_page_host) = prop.session.read().await.initial_url.host() {
         if let Some(host) = pg_url.host() {
