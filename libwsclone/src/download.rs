@@ -2,7 +2,6 @@ use crate::errors::WscError;
 use crate::Update::{MessageUpdate, ProgressUpdate};
 use crate::{DownloadRule, Message, Progress, Update};
 use chrono::Utc;
-use phf::phf_map;
 use reqwest::header::HeaderMap;
 use reqwest::{header, Client};
 
