@@ -5,12 +5,10 @@ use crate::session::Session;
 use reqwest::Client;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tokio::time::sleep;
 use tokio::{fs, spawn};
 use tracing::instrument;
 use url::Url;
@@ -403,7 +401,6 @@ fn download_static_resource(
 ) -> JoinHandle<Option<WscError>> {
     prop.file_name = None;
     spawn(async move {
-        sleep(Duration::from_secs(MAX_SLEEP_SECONDS as u64)).await;
         return match download_file(
             prop.session_id,
             DownloadItem {
