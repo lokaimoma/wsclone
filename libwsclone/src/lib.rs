@@ -29,7 +29,7 @@ pub struct DownloadRule {
     pub download_static_resource_with_unknown_size: bool,
     /// Progress update interval in millisecond
     pub progress_update_interval: u64,
-    /// Max levels of pages to download. Default is 1, which means download
+    /// Max levels of pages to download. Default is 0, which means download
     /// only the initial page and it's resources.
     pub max_level: u8,
     pub black_list_urls: Vec<String>,
@@ -102,7 +102,7 @@ pub async fn init_download(
 
     let mut a_href_links: Vec<(String, Url)> = match download_page_with_static_resources(
         update_tx.clone(),
-        rule.max_level - 1 > 0,
+        rule.max_level > 0,
         link,
         &Url::parse(link).unwrap(),
         DownloadProp {

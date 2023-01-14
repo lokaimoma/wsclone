@@ -19,7 +19,7 @@ pub struct Cli {
     output_directory: String,
     #[arg(default_value = "10000000", help = "Max file size in bytes.", long)]
     max_file_size: u64,
-    #[arg(default_value = "1", long)]
+    #[arg(default_value = "0", long)]
     max_level: u8,
     #[arg(
         help = "Abort download if any resource other than the first page encounters an error.",

@@ -1,4 +1,5 @@
 use scraper::{Html, Selector};
+use std::collections::HashSet;
 use tracing::{event, instrument, Level};
 use url::{ParseError, Url};
 
@@ -25,11 +26,11 @@ fn get_full_link(link: &str, page_url: &Url) -> Option<Url> {
     }
 }
 
-/// Gets all valid anchor tag links. The returned vector of tuples,
+/// Gets all valid anchor tag links. Each tuple,
 /// has as first element, the link found in the page and the second
 /// element is a parsed URL object of that link.
 /// E.g (/hello.html, https://www.example.com/hello.html as a Url object)  
-pub fn get_anchor_links(html_string: &str, page_url: Url) -> Vec<(String, Url)> {
+pub fn get_anchor_links(html_string: &str, page_url: Url) -> HashSet<(String, Url)> {
     let html_document = Html::parse_document(html_string);
     let anchor_tag_selector = Selector::parse(
         r###"
@@ -56,14 +57,14 @@ pub fn get_anchor_links(html_string: &str, page_url: Url) -> Vec<(String, Url)> 
             tracing::debug!("Full link for {} => {}", relative_link, &f_link);
             (relative_link, f_link)
         })
-        .collect::<Vec<(String, Url)>>()
+        .collect::<_>()
 }
 
-/// Gets all valid anchor css and javascript file links. The returned vector of
-/// tuples, has as first element, the link found in the page and the second
+/// Gets all valid anchor css and javascript file links. Each tuple,
+/// has as first element, the link found in the page and the second
 /// element is a parsed URL object of that link.
 /// E.g (/hello.js, https://www.example.com/hello.js as a Url object)
-pub fn get_static_resource_links(html_string: &str, page_url: Url) -> Vec<(String, Url)> {
+pub fn get_static_resource_links(html_string: &str, page_url: Url) -> HashSet<(String, Url)> {
     let html_document = Html::parse_document(html_string);
     let css_tag_selector = Selector::parse(r#"link[href][rel="stylesheet"]"#).unwrap();
     let js_tag_selector = Selector::parse("script[src]").unwrap();
@@ -89,5 +90,5 @@ pub fn get_static_resource_links(html_string: &str, page_url: Url) -> Vec<(Strin
             tracing::debug!("Full link for {} => {}", relative_link, &f_link);
             (relative_link, f_link)
         })
-        .collect::<Vec<(String, Url)>>()
+        .collect::<_>()
 }
