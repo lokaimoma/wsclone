@@ -223,7 +223,9 @@ async fn download_page_with_static_resources(
                     .await
                     .processed_pages
                     .insert(raw_link.to_string(), page_f_path.to_string());
-                let static_res_links = match fs::read_to_string(&page_f_path).await {
+                let static_res_links: Vec<(String, Url)> = match fs::read_to_string(&page_f_path)
+                    .await
+                {
                     // This might mostly be a UTF-8 error and rarely a read operation error
                     // We only abort if it's the initial page.
                     Err(e) => {
@@ -247,10 +249,22 @@ async fn download_page_with_static_resources(
                         return Ok(None);
                     }
                     Ok(html) => {
+                        let dest_dir = &prop.dest_dir;
                         if more_pages {
-                            pages = Some(get_anchor_links(&html, pg_url.to_owned()));
+                            // If a page has already been downloaded and all links replaced, the
+                            // links to the static resources will point to their local files. Which
+                            // we don't want to try downloading (404). Hence the filtering.
+                            pages = Some(
+                                get_anchor_links(&html, pg_url.to_owned())
+                                    .into_iter()
+                                    .filter(|(raw_link, _)| !raw_link.contains(dest_dir))
+                                    .collect(),
+                            );
                         }
                         get_static_resource_links(&html, pg_url.to_owned())
+                            .into_iter()
+                            .filter(|(raw_link, _)| !raw_link.contains(dest_dir))
+                            .collect()
                     }
                 };
                 let mut dld_tasks: Vec<JoinHandle<Option<WscError>>> = Vec::new();

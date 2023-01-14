@@ -67,7 +67,6 @@ pub async fn download(cli: Cli) {
         .await
         {
             Ok(_) => {
-                mp_clone.clear().unwrap();
                 mp_clone
                     .println(format!(
                         "Webpage(s) downloaded successfully. {}",
@@ -76,7 +75,6 @@ pub async fn download(cli: Cli) {
                     .unwrap();
             }
             Err(e) => {
-                mp_clone.clear().unwrap();
                 mp_clone
                     .println("Download wasn't able to complete")
                     .unwrap();
