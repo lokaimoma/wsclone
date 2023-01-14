@@ -191,9 +191,9 @@ async fn download_page_with_static_resources(
     prop: DownloadProp,
 ) -> Result<Option<Vec<(String, Url)>>, WscError> {
     // Check if current page and initial page belong to the same host.
-    if let Some(init_pg_host) = prop.session.read().await.initial_url.host() {
+    if let Some(initial_page_host) = prop.session.read().await.initial_url.host() {
         if let Some(host) = pg_url.host() {
-            if init_pg_host.to_string() != host.to_string() {
+            if initial_page_host.to_string() != host.to_string() {
                 tracing::debug!("Skipping {}", pg_url.to_string());
                 return Ok(None);
             }

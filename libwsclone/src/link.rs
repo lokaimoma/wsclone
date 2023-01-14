@@ -4,18 +4,18 @@ use url::{ParseError, Url};
 
 #[instrument]
 /// Get the full link to a sub-page or file, given a page's full url.
-fn get_full_link(link: &str, page_url: &Url) -> Option<String> {
+fn get_full_link(link: &str, page_url: &Url) -> Option<Url> {
     if link.is_empty() {
         return None;
     }
     match Url::parse(link) {
-        Ok(_) => Some(link.into()),
+        Ok(url) => Some(url),
         Err(e)
             if e == ParseError::EmptyHost
                 || e == ParseError::RelativeUrlWithoutBase
                 || e == ParseError::RelativeUrlWithCannotBeABaseBase =>
         {
-            Some(page_url.join(link).unwrap().to_string())
+            Some(page_url.join(link).unwrap())
         }
         Err(e) => {
             event!(Level::ERROR, "Failed to get full link for {}", link);
@@ -39,9 +39,23 @@ pub fn get_anchor_links(html_string: &str, page_url: Url) -> Vec<(String, Url)> 
     .unwrap();
     html_document
         .select(&anchor_tag_selector)
-        .filter(|element| !element.value().attr("href").unwrap_or("").contains('#'))
-        .filter_map(|element| get_full_link(element.value().attr("href").unwrap_or(""), &page_url))
-        .map(|link| (link.to_owned(), Url::parse(&link).unwrap()))
+        .filter(|element| {
+            let value = element.value().attr("href").unwrap_or("");
+            !value.is_empty() && !value.contains('#')
+        })
+        .map(|element| element.value().attr("href").unwrap())
+        .map(|relative_link| {
+            (
+                relative_link.to_owned(),
+                get_full_link(relative_link, &page_url),
+            )
+        })
+        .filter(|(_, link)| link.is_some())
+        .map(|(relative_link, full_link)| {
+            let f_link = full_link.unwrap();
+            tracing::debug!("Full link for {} => {}", relative_link, &f_link);
+            (relative_link, f_link)
+        })
         .collect::<Vec<(String, Url)>>()
 }
 
@@ -65,12 +79,15 @@ pub fn get_static_resource_links(html_string: &str, page_url: Url) -> Vec<(Strin
                 ""
             };
         })
-        .map(|link| {
-            let full_link = get_full_link(link, &page_url);
-            tracing::debug!("Full link for {} => {:?}", link, &full_link);
-            (link.to_string(), full_link)
+        .map(|relative_link| {
+            let full_link = get_full_link(relative_link, &page_url);
+            (relative_link.to_string(), full_link)
         })
         .filter(|(_, full_link)| full_link.is_some())
-        .map(|(link, full_link)| (link, Url::parse(&full_link.unwrap()).unwrap()))
+        .map(|(relative_link, full_link)| {
+            let f_link = full_link.unwrap();
+            tracing::debug!("Full link for {} => {}", relative_link, &f_link);
+            (relative_link, f_link)
+        })
         .collect::<Vec<(String, Url)>>()
 }
