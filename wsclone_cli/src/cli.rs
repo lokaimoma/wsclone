@@ -1,6 +1,7 @@
 use chrono::Utc;
 use clap::Parser;
 use libwsclone::{init_download, DownloadRule, Update};
+use owo_colors::{OwoColorize, Stream};
 use tokio::sync::mpsc::channel;
 use url::Url;
 
@@ -62,12 +63,18 @@ pub async fn download(cli: Cli) {
         {
             Ok(_) => {
                 println!(
-                    "Webpage(s) downloaded successfully. {}",
+                    "{} {}",
+                    "Webpage(s) downloaded successfully : "
+                        .if_supports_color(Stream::Stdout, |text| text.bright_green()),
                     cli.output_directory
                 );
             }
             Err(e) => {
-                println!("Download wasn't able to complete");
+                println!(
+                    "{}",
+                    "Download wasn't able to complete"
+                        .if_supports_color(Stream::Stdout, |text| text.bright_red())
+                );
                 println!("{}", e);
             }
         }
@@ -76,8 +83,18 @@ pub async fn download(cli: Cli) {
         match update {
             Update::MessageUpdate(msg) => {
                 println!(
-                    "{}{} | {}",
-                    if msg.is_error { "[ERROR] " } else { "[INFO]" },
+                    "{} {} | {}",
+                    if msg.is_error {
+                        format!(
+                            "{}",
+                            "[ERROR]".if_supports_color(Stream::Stdout, |text| text.bright_red())
+                        )
+                    } else {
+                        format!(
+                            "{}",
+                            "[INFO]".if_supports_color(Stream::Stdout, |text| text.green())
+                        )
+                    },
                     msg.content,
                     msg.resource_name
                 );
@@ -85,8 +102,11 @@ pub async fn download(cli: Cli) {
             Update::ProgressUpdate(progress) => {
                 if progress.bytes_written >= progress.file_size {
                     println!(
-                        "[DOWNLOADED] {} {} bytes",
-                        progress.resource_name, progress.file_size
+                        "{} {} {} bytes",
+                        "[DOWNLOADED]"
+                            .if_supports_color(Stream::Stdout, |text| text.bright_green()),
+                        progress.resource_name,
+                        progress.file_size
                     )
                 }
             }
