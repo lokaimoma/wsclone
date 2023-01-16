@@ -13,6 +13,8 @@ url = "2.3.1"
 chrono = "0.4.23"
 tracing-subscriber = {version = "0.3.16", features = ["env-filter"]}
 tracing-appender = "0.2.2"
+owo-colors = {version = "3.5.0", features = ["supports-colors"]}
 
 libwsclone = {path = "../libwsclone"}
+
 
