@@ -29,9 +29,10 @@ fn get_full_link(link: &str, page_url: &Url) -> Option<Url> {
 /// Gets all valid anchor tag links. Each tuple,
 /// has as first element, the link found in the page and the second
 /// element is a parsed URL object of that link in relation with the
-// /// current page's url.
-/// E.g (/hello.html, https://www.example.com/hello.html as a Url object)  
-pub fn get_anchor_links(html_string: &str, page_url: Url) -> HashSet<(String, Url)> {
+// /// current page's url and the element attribute that provided
+// the relative link. E.g: href, src,etc.
+/// E.g (/hello.html, https://www.example.com/hello.html as a Url object, href)  
+pub fn get_anchor_links(html_string: &str, page_url: Url) -> HashSet<(String, Url, String)> {
     let html_document = Html::parse_document(html_string);
     let anchor_tag_selector = Selector::parse(
         r##"
@@ -56,7 +57,7 @@ pub fn get_anchor_links(html_string: &str, page_url: Url) -> HashSet<(String, Ur
         .map(|(relative_link, full_link)| {
             let f_link = full_link.unwrap();
             tracing::debug!("Full link for {} => {}", relative_link, &f_link);
-            (relative_link, f_link)
+            (relative_link, f_link, "href".to_string())
         })
         .collect::<_>()
 }
@@ -64,9 +65,13 @@ pub fn get_anchor_links(html_string: &str, page_url: Url) -> HashSet<(String, Ur
 /// Gets all valid static web resource file links. Each tuple,
 /// has as first element, the link found in the page and the second
 /// element is a parsed URL object of that link in relation with the
-/// current page's url.
-/// E.g (/hello.js, https://www.example.com/hello.js as a Url object)
-pub fn get_static_resource_links(html_string: &str, page_url: Url) -> HashSet<(String, Url)> {
+/// current page's url and the element attribute that provided
+// // the relative link. E.g: href, src,etc.
+/// E.g (/hello.js, https://www.example.com/hello.js as a Url object, src)
+pub fn get_static_resource_links(
+    html_string: &str,
+    page_url: Url,
+) -> HashSet<(String, Url, String)> {
     let html_document = Html::parse_document(html_string);
     let css_tag_selector = Selector::parse(r#"link[href][rel="stylesheet"]"#).unwrap();
     let js_tag_selector = Selector::parse("script[src]").unwrap();
@@ -78,22 +83,22 @@ pub fn get_static_resource_links(html_string: &str, page_url: Url) -> HashSet<(S
         .chain(html_document.select(&img_tag_selector))
         .map(|element| {
             return if let Some(href) = element.value().attr("href") {
-                href
+                (href, "href")
             } else if let Some(src) = element.value().attr("src") {
-                src
+                (src, "src")
             } else {
-                ""
+                ("", "")
             };
         })
-        .map(|relative_link| {
+        .map(|(relative_link, attrib)| {
             let full_link = get_full_link(relative_link, &page_url);
-            (relative_link.to_string(), full_link)
+            (relative_link.to_string(), full_link, attrib)
         })
-        .filter(|(_, full_link)| full_link.is_some())
-        .map(|(relative_link, full_link)| {
+        .filter(|(_, full_link, _)| full_link.is_some())
+        .map(|(relative_link, full_link, attrib)| {
             let f_link = full_link.unwrap();
             tracing::debug!("Full link for {} => {}", relative_link, &f_link);
-            (relative_link, f_link)
+            (relative_link, f_link, attrib.to_string())
         })
         .collect::<_>()
 }
