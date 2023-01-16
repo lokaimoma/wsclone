@@ -1,7 +1,7 @@
 use crate::download::{download_file, DownloadItem};
 use crate::errors::WscError;
 use crate::link::{get_anchor_links, get_static_resource_links};
-use crate::session::Session;
+use crate::session::{LinkInfo, Session};
 use reqwest::Client;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -158,21 +158,25 @@ pub async fn init_download(
     }
 
     let mut raw_links: Vec<String> = Vec::new();
-    let mut res_f_loc: Vec<String> = Vec::new();
+    let mut res_f_loc: Vec<&str> = Vec::new();
 
-    for (r_link, r_loc) in session_lock
-        .read()
-        .await
+    let session = session_lock.read().await;
+
+    for (_, link_info) in session
         .processed_static_files
         .iter()
-        .chain(session_lock.read().await.processed_pages.iter())
+        .chain(session.processed_pages.iter())
     {
-        raw_links.push(r_link.to_string());
-        res_f_loc.push(r_loc.to_string());
+        raw_links.push(format!(
+            r#"{attribute}="{relative_link}""#,
+            attribute = link_info.element_attribute,
+            relative_link = link_info.relative_link
+        ));
+        res_f_loc.push(&link_info.file_path);
     }
 
-    for (_, page_f_loc) in session_lock.read().await.processed_pages.iter() {
-        link_page_to_static_resources(page_f_loc, &raw_links, &res_f_loc).await?;
+    for (_, link_info) in session_lock.read().await.processed_pages.iter() {
+        link_page_to_static_resources(&link_info.file_path, &raw_links, &res_f_loc).await?;
     }
     tracing::debug!("Session completed");
     Ok(())
@@ -182,24 +186,15 @@ pub async fn init_download(
 async fn download_page_with_static_resources(
     update_tx: Sender<Update>,
     more_pages: bool,
-    raw_link: &str,
-    pg_url: &Url,
+    relative_link: &str,
+    full_link: &Url,
     prop: DownloadProp,
 ) -> Result<Option<Vec<(String, Url)>>, WscError> {
-    if prop
-        .session
-        .read()
-        .await
-        .processed_pages
-        .contains_key(raw_link)
-    {
-        return Ok(None);
-    }
     // Check if current page and initial page belong to the same host.
     if let Some(initial_page_host) = prop.session.read().await.initial_url.host() {
-        if let Some(host) = pg_url.host() {
+        if let Some(host) = full_link.host() {
             if initial_page_host.to_string() != host.to_string() {
-                tracing::debug!("Skipping {}", pg_url.to_string());
+                tracing::debug!("Skipping {}", full_link.to_string());
                 return Ok(None);
             }
         }
@@ -210,7 +205,7 @@ async fn download_page_with_static_resources(
     match download_file(
         prop.session_id.to_string(),
         DownloadItem {
-            link: pg_url.to_owned(),
+            link: full_link.to_owned(),
             destination_dir: PathBuf::from(&prop.dest_dir),
         },
         &prop.client,
@@ -224,68 +219,78 @@ async fn download_page_with_static_resources(
         Ok(res) => {
             if res.is_some() {
                 let page_f_path = res.unwrap();
-                prop.session
-                    .write()
-                    .await
-                    .processed_pages
-                    .insert(raw_link.to_string(), page_f_path.to_string());
-                let static_res_links: Vec<(String, Url)> = match fs::read_to_string(&page_f_path)
-                    .await
-                {
-                    // This might mostly be a UTF-8 error and rarely a read operation error
-                    // We only abort if it's the initial page.
-                    Err(e) => {
-                        tracing::error!("Error reading file {}\nError : {}", page_f_path, e);
-                        update_tx
-                            .send(Update::MessageUpdate(Message {
-                                session_id: prop.session_id.clone(),
-                                content: format!("Error reading file for resource links. {}", e),
-                                resource_name: "".to_string(),
-                                is_error: false,
-                            }))
-                            .await
-                            .unwrap();
-                        // This is valid for only the initial page
-                        if prop.file_name.is_some() {
-                            return Err(WscError::FileOperationError {
-                                file_name: page_f_path,
-                                message: format!("{} | {}", e, e.kind()),
-                            });
+                prop.session.write().await.processed_pages.insert(
+                    full_link.to_string(),
+                    LinkInfo {
+                        relative_link: relative_link.to_string(),
+                        file_path: page_f_path.to_string(),
+                        element_attribute: "href".to_string(),
+                    },
+                );
+                let static_res_links: Vec<(String, Url, String)> =
+                    match fs::read_to_string(&page_f_path).await {
+                        // This might mostly be a UTF-8 error and rarely a read operation error
+                        // We only abort if it's the initial page.
+                        Err(e) => {
+                            tracing::error!("Error reading file {}\nError : {}", page_f_path, e);
+                            update_tx
+                                .send(Update::MessageUpdate(Message {
+                                    session_id: prop.session_id.clone(),
+                                    content: format!(
+                                        "Error reading file for resource links. {}",
+                                        e
+                                    ),
+                                    resource_name: "".to_string(),
+                                    is_error: false,
+                                }))
+                                .await
+                                .unwrap();
+                            // This is valid for only the initial page
+                            if prop.file_name.is_some() {
+                                return Err(WscError::FileOperationError {
+                                    file_name: page_f_path,
+                                    message: format!("{} | {}", e, e.kind()),
+                                });
+                            }
+                            return Ok(None);
                         }
-                        return Ok(None);
-                    }
-                    Ok(html) => {
-                        let dest_dir = &prop.dest_dir;
-                        let session = prop.session.read().await;
-                        if more_pages {
-                            // If a page has already been downloaded and all links replaced, the
-                            // links to the static resources will point to their local files. Which
-                            // we don't want to try downloading (404). Hence the filtering.
-                            pages = Some(
-                                get_anchor_links(&html, pg_url.to_owned())
-                                    .into_iter()
-                                    .filter(|(raw_link, _)| {
-                                        !raw_link.contains(dest_dir)
-                                            && !session.processed_pages.contains_key(raw_link)
-                                    })
-                                    .collect(),
-                            );
+                        Ok(html) => {
+                            let dest_dir = &prop.dest_dir;
+                            let session = prop.session.read().await;
+                            if more_pages {
+                                // If a page has already been downloaded and all links replaced, the
+                                // links to the static resources will point to their local files. Which
+                                // we don't want to try downloading (404). Hence the filtering.
+                                pages = Some(
+                                    get_anchor_links(&html, full_link.to_owned())
+                                        .into_iter()
+                                        .filter(|(relative_link, url)| {
+                                            !relative_link.contains(dest_dir)
+                                                && !session
+                                                    .processed_pages
+                                                    .contains_key(&url.to_string())
+                                        })
+                                        .collect(),
+                                );
+                            }
+                            get_static_resource_links(&html, full_link.to_owned())
+                                .into_iter()
+                                .filter(|(relative_link, url, _)| {
+                                    !relative_link.contains(dest_dir)
+                                        && !session
+                                            .processed_static_files
+                                            .contains_key(&url.to_string())
+                                })
+                                .collect()
                         }
-                        get_static_resource_links(&html, pg_url.to_owned())
-                            .into_iter()
-                            .filter(|(raw_link, _)| {
-                                !raw_link.contains(dest_dir)
-                                    && !session.processed_static_files.contains_key(raw_link)
-                            })
-                            .collect()
-                    }
-                };
+                    };
                 let mut dld_tasks: Vec<JoinHandle<Option<WscError>>> = Vec::new();
-                for (raw_link, parsed_link) in static_res_links {
+                for (raw_link, parsed_link, attrib) in static_res_links {
                     let task = download_static_resource(
                         update_tx.clone(),
                         raw_link,
                         parsed_link,
+                        attrib,
                         prop.clone(),
                     );
                     dld_tasks.push(task);
@@ -324,11 +329,51 @@ async fn download_page_with_static_resources(
     Ok(pages)
 }
 
+fn download_static_resource(
+    update_tx: Sender<Update>,
+    relative_link: String,
+    full_link: Url,
+    attribute: String,
+    mut prop: DownloadProp,
+) -> JoinHandle<Option<WscError>> {
+    prop.file_name = None;
+    spawn(async move {
+        return match download_file(
+            prop.session_id,
+            DownloadItem {
+                link: full_link.clone(),
+                destination_dir: PathBuf::from(prop.dest_dir),
+            },
+            &prop.client,
+            &prop.rule,
+            update_tx,
+            None,
+        )
+        .await
+        {
+            Ok(opt_f_path) => {
+                if let Some(f_path) = opt_f_path {
+                    prop.session.write().await.processed_static_files.insert(
+                        full_link.to_string(),
+                        LinkInfo {
+                            relative_link,
+                            file_path: f_path,
+                            element_attribute: attribute,
+                        },
+                    );
+                }
+                return None;
+            }
+            Err(e) => Some(e),
+        };
+    })
+}
+
 #[tracing::instrument]
 async fn link_page_to_static_resources(
     page_file_path: &str,
-    raw_links: &Vec<String>,
-    res_f_loc: &[String],
+    raw_links: &[String],
+    res_f_loc: &[&str],
 ) -> Result<(), WscError> {
     let html_string = match fs::read_to_string(&page_file_path).await {
         Ok(s) => s,
@@ -389,40 +434,4 @@ async fn link_page_to_static_resources(
     }
 
     Ok(())
-}
-
-fn download_static_resource(
-    update_tx: Sender<Update>,
-    raw_link: String,
-    parsed_link: Url,
-    mut prop: DownloadProp,
-) -> JoinHandle<Option<WscError>> {
-    prop.file_name = None;
-    spawn(async move {
-        return match download_file(
-            prop.session_id,
-            DownloadItem {
-                link: parsed_link,
-                destination_dir: PathBuf::from(prop.dest_dir),
-            },
-            &prop.client,
-            &prop.rule,
-            update_tx,
-            None,
-        )
-        .await
-        {
-            Ok(opt_f_path) => {
-                if let Some(f_path) = opt_f_path {
-                    prop.session
-                        .write()
-                        .await
-                        .processed_static_files
-                        .insert(raw_link, f_path);
-                }
-                return None;
-            }
-            Err(e) => Some(e),
-        };
-    })
 }

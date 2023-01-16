@@ -29,10 +29,9 @@ fn get_full_link(link: &str, page_url: &Url) -> Option<Url> {
 /// Gets all valid anchor tag links. Each tuple,
 /// has as first element, the link found in the page and the second
 /// element is a parsed URL object of that link in relation with the
-// /// current page's url and the element attribute that provided
-// the relative link. E.g: href, src,etc.
+/// current page's url.
 /// E.g (/hello.html, https://www.example.com/hello.html as a Url object, href)  
-pub fn get_anchor_links(html_string: &str, page_url: Url) -> HashSet<(String, Url, String)> {
+pub fn get_anchor_links(html_string: &str, page_url: Url) -> HashSet<(String, Url)> {
     let html_document = Html::parse_document(html_string);
     let anchor_tag_selector = Selector::parse(
         r##"
@@ -57,7 +56,7 @@ pub fn get_anchor_links(html_string: &str, page_url: Url) -> HashSet<(String, Ur
         .map(|(relative_link, full_link)| {
             let f_link = full_link.unwrap();
             tracing::debug!("Full link for {} => {}", relative_link, &f_link);
-            (relative_link, f_link, "href".to_string())
+            (relative_link, f_link)
         })
         .collect::<_>()
 }
@@ -66,7 +65,7 @@ pub fn get_anchor_links(html_string: &str, page_url: Url) -> HashSet<(String, Ur
 /// has as first element, the link found in the page and the second
 /// element is a parsed URL object of that link in relation with the
 /// current page's url and the element attribute that provided
-// // the relative link. E.g: href, src,etc.
+/// the relative link. E.g: href, src,etc.
 /// E.g (/hello.js, https://www.example.com/hello.js as a Url object, src)
 pub fn get_static_resource_links(
     html_string: &str,
