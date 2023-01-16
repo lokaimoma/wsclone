@@ -158,7 +158,7 @@ pub async fn init_download(
     }
 
     let mut raw_links: Vec<String> = Vec::new();
-    let mut res_f_loc: Vec<&str> = Vec::new();
+    let mut res_f_loc: Vec<String> = Vec::new();
 
     let session = session_lock.read().await;
 
@@ -172,7 +172,11 @@ pub async fn init_download(
             attribute = link_info.element_attribute,
             relative_link = link_info.relative_link
         ));
-        res_f_loc.push(&link_info.file_path);
+        res_f_loc.push(format!(
+            r#"{attribute}="{file_path}""#,
+            attribute = link_info.element_attribute,
+            file_path = link_info.file_path
+        ));
     }
 
     for (_, link_info) in session_lock.read().await.processed_pages.iter() {
@@ -373,7 +377,7 @@ fn download_static_resource(
 async fn link_page_to_static_resources(
     page_file_path: &str,
     raw_links: &[String],
-    res_f_loc: &[&str],
+    res_f_loc: &[String],
 ) -> Result<(), WscError> {
     let html_string = match fs::read_to_string(&page_file_path).await {
         Ok(s) => s,
