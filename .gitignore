@@ -2,3 +2,4 @@
 /downloads/
 *.log.*
 /.idea/
+/wsclone_ui/.vscode/
