@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "libwsclone",
-    "wsclone_cli",
-    "wsclone_ui/src-tauri"
+    "cli",
+    "ui/desktop/src-tauri",
+    "ui/daemon"
 ]
