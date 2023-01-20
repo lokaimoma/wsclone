@@ -16,32 +16,46 @@ where
 {
     let mut payload_size_buffer = Vec::with_capacity(PAYLOAD_SIZE_INFO_LENGTH);
     if let Err(e) = stream.read_buf(&mut payload_size_buffer).await {
-        return Err(Error::NO_OP); // TODO
+        return Err(Error::ErrorReadingMessage(format!(
+            "{} : {}",
+            e.to_string(),
+            e.kind()
+        )));
     }
     let buf_size = match String::from_utf8(payload_size_buffer) {
         Ok(v) => match v.parse::<u16>() {
             Ok(n) => n,
-            Err(e) => {
-                return Err(Error::NO_OP); // TODO
+            Err(_) => {
+                return Err(Error::InvalidPayload(format!(
+                    "First {} bytes weren't a correct integer",
+                    PAYLOAD_SIZE_INFO_LENGTH
+                )));
             }
         },
-        Err(e) => {
-            return Err(Error::NO_OP); // TODO
+        Err(_) => {
+            return Err(Error::InvalidPayload(format!(
+                "First {} bytes weren't a valid UTF-8 string",
+                PAYLOAD_SIZE_INFO_LENGTH
+            )));
         }
     };
     let mut payload_buf: Vec<u8> = Vec::with_capacity(buf_size.into());
     if let Err(e) = stream.read_buf(&mut payload_buf).await {
-        return Err(Error::NO_OP); // TODO
+        return Err(Error::ErrorReadingMessage(format!(
+            "{} : {}",
+            e.to_string(),
+            e.kind()
+        )));
     }
     return match String::from_utf8(payload_buf) {
         Ok(s) => Ok(s),
-        Err(e) => {
-            Err(Error::NO_OP) // TODO
-        }
+        Err(e) => Err(Error::InvalidPayload(
+            "Message not a valid UTF-8 string".to_string(),
+        )),
     };
 }
 
-pub fn payload_to_bytes(message: &str) -> Result<Vec<u8>, NotifyaError> {
+pub fn payload_to_bytes(message: &str) -> Result<Vec<u8>, Error> {
     let payload_size = message.len().to_string();
     let mut payload = "0000"[0..PAYLOAD_SIZE_INFO_LENGTH - payload_size.len()].to_owned();
     payload.push_str(&payload_size);

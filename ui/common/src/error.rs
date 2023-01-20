@@ -1,3 +1,4 @@
 pub enum Error {
-    NO_OP,
+    InvalidPayload(String),
+    ErrorReadingMessage(String),
 }
