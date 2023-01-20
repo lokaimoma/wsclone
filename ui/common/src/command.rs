@@ -12,6 +12,7 @@ pub enum CommandType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Command<T> {
+    #[serde(rename(serialize = "type"))]
     pub type_: CommandType,
     pub props: T,
 }
