@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::error::{Error, Result};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 
 const PAYLOAD_SIZE_INFO_LENGTH: usize = 4;
@@ -10,17 +10,13 @@ const PAYLOAD_SIZE_INFO_LENGTH: usize = 4;
 /// message we want to send. An example of such expected payload will be
 /// 0005hello. With the size of "hello" being 5 hence 0005 followed by the
 /// the message "hello".
-pub async fn get_payload_content<T>(stream: &mut T) -> Result<String, Error>
+pub async fn get_payload_content<T>(stream: &mut T) -> Result<String>
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
     let mut payload_size_buffer = Vec::with_capacity(PAYLOAD_SIZE_INFO_LENGTH);
     if let Err(e) = stream.read_buf(&mut payload_size_buffer).await {
-        return Err(Error::ErrorReadingMessage(format!(
-            "{} : {}",
-            e.to_string(),
-            e.kind()
-        )));
+        return Err(Error::ErrorReadingMessage(format!("{} : {}", e, e.kind())));
     }
     let buf_size = match String::from_utf8(payload_size_buffer) {
         Ok(v) => match v.parse::<u16>() {
@@ -41,25 +37,21 @@ where
     };
     let mut payload_buf: Vec<u8> = Vec::with_capacity(buf_size.into());
     if let Err(e) = stream.read_buf(&mut payload_buf).await {
-        return Err(Error::ErrorReadingMessage(format!(
-            "{} : {}",
-            e.to_string(),
-            e.kind()
-        )));
+        return Err(Error::ErrorReadingMessage(format!("{} : {}", e, e.kind())));
     }
-    return match String::from_utf8(payload_buf) {
+    match String::from_utf8(payload_buf) {
         Ok(s) => Ok(s),
-        Err(e) => Err(Error::InvalidPayload(
+        Err(_) => Err(Error::InvalidPayload(
             "Message not a valid UTF-8 string".to_string(),
         )),
-    };
+    }
 }
 
-pub fn payload_to_bytes(message: &str) -> Result<Vec<u8>, Error> {
+pub fn payload_to_bytes(message: &str) -> Result<Vec<u8>> {
     let payload_size = message.len().to_string();
     let mut payload = "0000"[0..PAYLOAD_SIZE_INFO_LENGTH - payload_size.len()].to_owned();
     payload.push_str(&payload_size);
-    payload.push_str(&message);
+    payload.push_str(message);
     Ok(Vec::from(payload.as_bytes()))
 }
 #[cfg(test)]
