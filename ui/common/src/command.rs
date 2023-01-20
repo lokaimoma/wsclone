@@ -1,3 +1,6 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
 pub enum CommandType {
     Clone,
     CloneStatus,
@@ -7,11 +10,13 @@ pub enum CommandType {
     QueueClone,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Command<T> {
     pub type_: CommandType,
     pub props: T,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CloneProp {
     pub session_id: String,
     pub link: String,
@@ -29,5 +34,7 @@ pub struct CloneProp {
 }
 
 /// The following structs takes as argument the session id of a clone.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CloneStatusProp(String);
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AbortClone(String);
