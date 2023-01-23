@@ -22,7 +22,9 @@ pub struct DaemonCli {
 impl DaemonCli {
     #[cfg(target_family = "unix")]
     pub async fn run_server(&self) -> Result<()> {
-        if let Err(e) = std::fs::remove_file(self.socket_file_path.as_path()) {};
+        if let Err(e) = std::fs::remove_file(self.socket_file_path.as_path()) {
+            return Err(Error::IOError(format!("{} : {}", e, e.kind())));
+        };
         let listener = self.get_unix_socket_listener()?;
         loop {
             let (stream, _) = match listener.accept().await {
