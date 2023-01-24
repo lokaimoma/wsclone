@@ -1,7 +1,40 @@
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use ws_common::command::Command;
+use ws_common::ipc_helpers;
+use ws_common::response;
 
-pub async fn handle_connection<T>(stream: T)
+pub async fn handle_connection<T>(mut stream: T)
 where
-    T: AsyncRead + AsyncWrite + Send,
+    T: AsyncRead + AsyncWrite + Send + Unpin,
 {
+    let payload = match ipc_helpers::get_payload_content(&mut stream).await {
+        Ok(r) => r,
+        Err(e) => {
+            send_err(&mut stream, e.to_string()).await;
+            return;
+        }
+    };
+
+    let cmd: Command = match serde_json::from_str(&payload) {
+        Ok(r) => r,
+        Err(e) => {
+            send_err(
+                &mut stream,
+                format!("Error parsing payload to command type : {}", e),
+            )
+            .await;
+            return;
+        }
+    };
+
+    send_err(&mut stream, "Command not implemented yet".to_string()).await;
+}
+
+async fn send_err<T>(stream: &mut T, msg: String)
+where
+    T: AsyncRead + AsyncWrite + Send + Unpin,
+{
+    let err = response::Err { msg };
+    let bytes = ipc_helpers::payload_to_bytes(&serde_json::to_string(&err).unwrap()).unwrap();
+    stream.write_all(&bytes).await.unwrap();
 }

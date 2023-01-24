@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CommandType {
     Clone,
@@ -11,14 +11,14 @@ pub enum CommandType {
     QueueClone,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Command<T> {
+#[derive(Debug, Deserialize)]
+pub struct Command {
     #[serde(rename(serialize = "type"))]
     pub type_: CommandType,
-    pub props: T,
+    pub props: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct CloneProp {
     pub session_id: String,
     pub link: String,
@@ -36,7 +36,7 @@ pub struct CloneProp {
 }
 
 /// The following structs takes as argument the session id of a clone.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct CloneStatusProp(String);
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AbortClone(String);

@@ -1,3 +1,4 @@
-mod command;
+pub mod command;
 mod error;
-mod ipc_helpers;
+pub mod ipc_helpers;
+pub mod response;
