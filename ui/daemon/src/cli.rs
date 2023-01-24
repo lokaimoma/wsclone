@@ -1,4 +1,4 @@
-use crate::command_handlers::handle_connection;
+use crate::handlers::handle_connection;
 use crate::error::{Error, Result};
 use clap::Parser;
 use std::path::PathBuf;

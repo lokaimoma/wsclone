@@ -2,8 +2,9 @@ use crate::cli::DaemonCli;
 use clap::Parser;
 
 mod cli;
-mod command_handlers;
 mod error;
+mod handlers;
+mod state;
 
 #[tokio::main]
 async fn main() {
