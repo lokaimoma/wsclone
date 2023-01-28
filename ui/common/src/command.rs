@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub enum CommandType {
     Clone,
     CloneStatus,
-    DaemonStatus,
+    HealthCheck,
     GetClones,
     AbortClone,
     QueueClone,

@@ -4,3 +4,6 @@ use serde::Serialize;
 pub struct Err {
     pub msg: String,
 }
+
+#[derive(Debug, Serialize)]
+pub struct HealthCheck(String);

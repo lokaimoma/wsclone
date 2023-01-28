@@ -1,13 +1,14 @@
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
-use ws_common::command::Command;
+use ws_common::command::{Command, CommandType};
 use ws_common::ipc_helpers;
 use ws_common::response;
+use ws_common::response::HealthCheck;
 
 pub async fn handle_connection<T>(mut stream: T)
 where
     T: AsyncRead + AsyncWrite + Send + Unpin,
 {
-    let payload = match ipc_helpers::get_payload_content(&mut stream).await {
+    let cmd = match ipc_helpers::get_payload_content(&mut stream).await {
         Ok(r) => r,
         Err(e) => {
             send_err(&mut stream, e.to_string()).await;
@@ -15,7 +16,7 @@ where
         }
     };
 
-    let cmd: Command = match serde_json::from_str(&payload) {
+    let cmd: Command = match serde_json::from_str(&cmd) {
         Ok(r) => r,
         Err(e) => {
             send_err(
@@ -26,6 +27,30 @@ where
             return;
         }
     };
+
+    match cmd.type_ {
+        CommandType::HealthCheck => {
+            let payload = HealthCheck("Alive".to_string());
+            let payload =
+                ipc_helpers::payload_to_bytes(&serde_json::to_string(&payload).unwrap()).unwrap();
+            stream.write_all(&payload).unwrap();
+        }
+        CommandType::AbortClone => {
+            todo!()
+        }
+        CommandType::Clone => {
+            todo!()
+        }
+        CommandType::CloneStatus => {
+            todo!()
+        }
+        CommandType::GetClones => {
+            todo!()
+        }
+        CommandType::QueueClone => {
+            todo!()
+        }
+    }
 
     send_err(&mut stream, "Command not implemented yet".to_string()).await;
 }
