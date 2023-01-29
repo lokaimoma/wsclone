@@ -2,7 +2,7 @@ use crate::state::DaemonState;
 use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio::sync::RwLock;
-use ws_common::command::{AbortCloneProp, Command, CommandType};
+use ws_common::command::{AbortCloneProp, CloneProp, Command, CommandType};
 use ws_common::ipc_helpers;
 use ws_common::response;
 
@@ -32,11 +32,25 @@ where
 
     match cmd.type_ {
         CommandType::HealthCheck => {
-            let payload = response::HealthCheck("Alive".to_string());
+            let payload = response::Ok("Alive".to_string());
             let payload =
                 ipc_helpers::payload_to_bytes(&serde_json::to_string(&payload).unwrap()).unwrap();
             stream.write_all(&payload).unwrap();
-            return;
+        }
+        CommandType::QueueClone => {
+            let clone_prop: CloneProp = match serde_json::from_str(&cmd.props) {
+                Ok(v) => v,
+                Err(e) => {
+                    send_err(stream, format!("Invalid clone prop payload : {}", e)).await;
+                    return;
+                }
+            };
+            let app_state = app_state.write().await;
+            app_state.queued_links.push(clone_prop);
+            let response = response::Ok("Clone task queued successfully".to_string());
+            let response = serde_json::to_string(&response).unwrap();
+            let response = ipc_helpers::payload_to_bytes(&response).unwrap();
+            stream.write_all(&response).await.unwrap();
         }
         CommandType::AbortClone => handle_abort_clone(&mut stream, app_state, cmd).await,
         _ => send_err(&mut stream, "Command not implemented yet".to_string()).await,
@@ -73,7 +87,7 @@ async fn handle_abort_clone<T>(
         }
         app_state.current_session_id = None;
     }
-    let response = response::AbortClone("Abort successful".to_string());
+    let response = response::Ok("Abort successful".to_string());
     let response = serde_json::to_string(&response).unwrap();
     let response = ipc_helpers::payload_to_bytes(&response).unwrap();
     stream.write_all(&response).await.unwrap();

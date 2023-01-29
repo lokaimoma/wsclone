@@ -2,9 +2,10 @@ use libwsclone::Update;
 use std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
+use ws_common::command::CloneProp;
 
 pub struct DaemonState {
-    pub(crate) queued_links: Vec<String>,
+    pub(crate) queued_links: Vec<CloneProp>,
     pub tx: Sender<Update>,
     pub current_session_id: Option<String>,
     pub current_session_thread: Option<JoinHandle<()>>,
