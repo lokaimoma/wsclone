@@ -1,4 +1,6 @@
 use crate::state::DaemonState;
+use libwsclone::DownloadRule;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio::sync::RwLock;
@@ -52,9 +54,59 @@ where
             let response = ipc_helpers::payload_to_bytes(&response).unwrap();
             stream.write_all(&response).await.unwrap();
         }
+        CommandType::Clone => handle_clone(&mut stream, &app_state, cmd).await,
         CommandType::AbortClone => handle_abort_clone(&mut stream, app_state, cmd).await,
         _ => send_err(&mut stream, "Command not implemented yet".to_string()).await,
     }
+}
+
+async fn handle_clone<T>(mut stream: &mut T, app_state: &Arc<RwLock<DaemonState>>, cmd: Command)
+where
+    T: AsyncRead + AsyncWrite + Send + Unpin,
+{
+    let app_state = app_state.write().await;
+    if app_state.current_session_id.is_some() {
+        let response =
+            response::Err("A clone task is already running in the background".to_string());
+        let response = serde_json::to_string(&response).uwrap();
+        let response = ipc_helpers::payload_to_bytes(&response).unwrap();
+        stream.write_all(&response).await.unwrap();
+        return;
+    }
+    let clone_prop: CloneProp = match serde_json::from_str(&cmd.props) {
+        Ok(v) => v,
+        Err(e) => {
+            send_err(stream, format!("Invalid clone prop payload : {}", e)).await;
+            return;
+        }
+    };
+    app_state.current_session_id = Some(clone_prop.session_id.clone());
+    app_state.current_session_updates = Some(HashMap::new());
+    let handle = tokio::spawn(async move {
+        libwsclone::init_download(
+            &clone_prop.session_id,
+            &clone_prop.link,
+            &clone_prop.dest_dir,
+            DownloadRule {
+                max_static_file_size: clone_prop.max_static_file_size,
+                download_static_resource_with_unknown_size: clone_prop
+                    .download_static_resource_with_unknown_size,
+                progress_update_interval: clone_prop.progress_update_interval,
+                max_level: clone_prop.max_level,
+                black_list_urls: clone_prop.black_list_urls,
+                abort_on_download_error: clone_prop.abort_on_download_error,
+            },
+            app_state.tx.clone(),
+        )
+        .await
+        .unwrap();
+        ()
+    });
+    app_state.current_session_thread = Some(handle);
+    let response = response::Ok("Clone started successfully".to_string());
+    let response = serde_json::to_string(&response).unwrap();
+    let response = ipc_helpers::payload_to_bytes(&response).unwrap();
+    stream.write_all(&response).await.unwrap();
 }
 
 async fn handle_abort_clone<T>(
@@ -97,7 +149,7 @@ async fn send_err<T>(stream: &mut T, msg: String)
 where
     T: AsyncRead + AsyncWrite + Send + Unpin,
 {
-    let err = response::Err { msg };
+    let err = response::Err(msg);
     let bytes = ipc_helpers::payload_to_bytes(&serde_json::to_string(&err).unwrap()).unwrap();
     stream.write_all(&bytes).await.unwrap();
 }
