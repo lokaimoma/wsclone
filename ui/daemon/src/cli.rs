@@ -1,11 +1,14 @@
-use crate::handlers::handle_connection;
 use crate::error::{Error, Result};
+use crate::handlers::handle_connection;
+use crate::state::DaemonState;
 use clap::Parser;
 use std::path::PathBuf;
+use std::sync::Arc;
 #[cfg(not(target_family = "unix"))]
 use tokio::net::TcpListener;
 #[cfg(target_family = "unix")]
 use tokio::net::UnixListener;
+use tokio::sync::RwLock;
 
 #[derive(Parser, Debug)]
 #[command(about = "WsClone daemon", version)]
@@ -21,7 +24,7 @@ pub struct DaemonCli {
 
 impl DaemonCli {
     #[cfg(target_family = "unix")]
-    pub async fn run_server(&self) -> Result<()> {
+    pub async fn run_server(&self, state: Arc<RwLock<DaemonState>>) -> Result<()> {
         if let Err(e) = std::fs::remove_file(self.socket_file_path.as_path()) {
             return Err(Error::IOError(format!("{} : {}", e, e.kind())));
         };
@@ -35,13 +38,13 @@ impl DaemonCli {
             };
 
             tokio::spawn(async move {
-                handle_connection(stream).await;
+                handle_connection(stream, state.clone()).await;
             });
         }
     }
 
     #[cfg(not(target_family = "unix"))]
-    pub async fn run_server(&self) -> Result<()> {
+    pub async fn run_server(&self, state: Arc<RwLock<DaemonState>>) -> Result<()> {
         let listener = self.get_tcp_socket_listener().await?;
         loop {
             let (stream, _) = match listener.accept().await {
@@ -52,7 +55,7 @@ impl DaemonCli {
             };
 
             tokio::spawn(async move {
-                handle_connection(stream).await;
+                handle_connection(stream, state.clone()).await;
             });
         }
     }

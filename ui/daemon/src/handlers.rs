@@ -1,10 +1,13 @@
+use crate::state::DaemonState;
+use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use tokio::sync::RwLock;
 use ws_common::command::{Command, CommandType};
 use ws_common::ipc_helpers;
 use ws_common::response;
 use ws_common::response::HealthCheck;
 
-pub async fn handle_connection<T>(mut stream: T)
+pub async fn handle_connection<T>(mut stream: T, arc: Arc<RwLock<DaemonState>>)
 where
     T: AsyncRead + AsyncWrite + Send + Unpin,
 {

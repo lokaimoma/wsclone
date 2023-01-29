@@ -76,5 +76,5 @@ async fn main() {
             tokio::time::sleep(Duration::from_secs(MAX_RECEIVER_SLEEP_SECONDS)).await;
         }
     });
-    daemon_cli.run_server().await.unwrap();
+    daemon_cli.run_server(state).await.unwrap();
 }
