@@ -39,6 +39,43 @@ pub enum Update {
     ProgressUpdate(Progress),
 }
 
+impl Update {
+    pub fn get_resource_name(&self) -> &str {
+        match self {
+            Update::MessageUpdate(msg) => &msg.resource_name,
+            Update::ProgressUpdate(prog) => &prog.resource_name,
+        }
+    }
+
+    pub fn get_file_size(&self) -> Option<u64> {
+        match self {
+            Update::ProgressUpdate(prog) => Some(prog.file_size),
+            _ => None,
+        }
+    }
+
+    pub fn get_bytes_written(&self) -> Option<u64> {
+        match self {
+            Update::ProgressUpdate(prog) => Some(prog.bytes_written),
+            _ => None,
+        }
+    }
+
+    pub fn get_message(&self) -> Option<&str> {
+        match self {
+            Update::MessageUpdate(msg) => Some(msg.content.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn is_error(&self) -> bool {
+        match self {
+            Update::MessageUpdate(msg) => msg.is_error,
+            _ => true,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Message {
     pub session_id: String,

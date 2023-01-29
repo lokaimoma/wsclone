@@ -34,6 +34,7 @@ where
             let payload =
                 ipc_helpers::payload_to_bytes(&serde_json::to_string(&payload).unwrap()).unwrap();
             stream.write_all(&payload).unwrap();
+            return;
         }
         CommandType::AbortClone => {
             todo!()
