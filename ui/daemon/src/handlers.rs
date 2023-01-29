@@ -7,7 +7,7 @@ use ws_common::ipc_helpers;
 use ws_common::response;
 use ws_common::response::HealthCheck;
 
-pub async fn handle_connection<T>(mut stream: T, arc: Arc<RwLock<DaemonState>>)
+pub async fn handle_connection<T>(mut stream: T, _: Arc<RwLock<DaemonState>>)
 where
     T: AsyncRead + AsyncWrite + Send + Unpin,
 {
@@ -39,24 +39,8 @@ where
             stream.write_all(&payload).unwrap();
             return;
         }
-        CommandType::AbortClone => {
-            todo!()
-        }
-        CommandType::Clone => {
-            todo!()
-        }
-        CommandType::CloneStatus => {
-            todo!()
-        }
-        CommandType::GetClones => {
-            todo!()
-        }
-        CommandType::QueueClone => {
-            todo!()
-        }
+        _ => send_err(&mut stream, "Command not implemented yet".to_string()).await,
     }
-
-    send_err(&mut stream, "Command not implemented yet".to_string()).await;
 }
 
 async fn send_err<T>(stream: &mut T, msg: String)
