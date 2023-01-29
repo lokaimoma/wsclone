@@ -7,3 +7,6 @@ pub struct Err {
 
 #[derive(Debug, Serialize)]
 pub struct HealthCheck(String);
+
+#[derive(Debug, Serialize)]
+pub struct AbortClone(String);

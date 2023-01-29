@@ -26,6 +26,7 @@ async fn main() {
         current_session_thread: None,
         current_session_updates: None,
     }));
+    
     tokio::spawn(async move {
         let state = state.clone();
         while let Some(update) = rx.recv().await {
@@ -76,5 +77,6 @@ async fn main() {
             tokio::time::sleep(Duration::from_secs(MAX_RECEIVER_SLEEP_SECONDS)).await;
         }
     });
+    
     daemon_cli.run_server(state).await.unwrap();
 }

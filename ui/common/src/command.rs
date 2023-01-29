@@ -39,4 +39,4 @@ pub struct CloneProp {
 #[derive(Debug, Deserialize)]
 pub struct CloneStatusProp(String);
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AbortClone(String);
+pub struct AbortCloneProp(pub String);
