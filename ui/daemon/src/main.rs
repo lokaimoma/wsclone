@@ -4,7 +4,7 @@ use clap::Parser;
 use libwsclone::Update;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::mpsc::channel;
 use tokio::sync::RwLock;
 
 mod cli;
@@ -26,19 +26,21 @@ async fn main() {
         current_session_thread: None,
         current_session_updates: None,
     }));
-    
+
+    let state_clone = state.clone();
     tokio::spawn(async move {
-        let state = state.clone();
         while let Some(update) = rx.recv().await {
-            let state = state.write().await;
+            let mut state = state_clone.write().await;
             if state.current_session_updates.is_some() {
                 if state
                     .current_session_updates
+                    .as_ref()
                     .unwrap()
                     .contains_key(update.get_resource_name())
                 {
                     let f_update = state
                         .current_session_updates
+                        .as_mut()
                         .unwrap()
                         .get_mut(update.get_resource_name())
                         .unwrap();
@@ -56,7 +58,7 @@ async fn main() {
                         },
                     }
                 } else {
-                    state.current_session_updates.unwrap().insert(
+                    state.current_session_updates.as_mut().unwrap().insert(
                         update.get_resource_name().to_string(),
                         FileStatus {
                             bytes_written: update.get_bytes_written().unwrap_or(0),
@@ -70,13 +72,13 @@ async fn main() {
                                 None
                             },
                         },
-                    )
+                    );
                 }
             }
             drop(state);
             tokio::time::sleep(Duration::from_secs(MAX_RECEIVER_SLEEP_SECONDS)).await;
         }
     });
-    
+
     daemon_cli.run_server(state).await.unwrap();
 }

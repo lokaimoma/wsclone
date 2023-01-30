@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
-pub struct Err(String);
+pub struct Err(pub String);
 
 #[derive(Debug, Serialize)]
-pub struct Ok(String);
+pub struct Ok(pub String);

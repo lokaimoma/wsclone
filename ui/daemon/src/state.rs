@@ -19,6 +19,7 @@ pub struct FileStatus {
     pub(crate) message: Option<MessageContent>,
 }
 
+#[derive(Debug, Clone)]
 pub struct MessageContent {
     pub(crate) message: String,
     pub(crate) is_error: bool,

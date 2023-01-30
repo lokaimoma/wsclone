@@ -36,9 +36,9 @@ impl DaemonCli {
                     return Err(Error::SocketError(format!("{} | {}", e, e.kind())));
                 }
             };
-
+            let state = state.clone();
             tokio::spawn(async move {
-                handle_connection(stream, state.clone()).await;
+                handle_connection(stream, state).await;
             });
         }
     }
@@ -53,9 +53,9 @@ impl DaemonCli {
                     return Err(Error::SocketError(format!("{} | {}", e, e.kind())));
                 }
             };
-
+            let state = state.clone();
             tokio::spawn(async move {
-                handle_connection(stream, state.clone()).await;
+                handle_connection(stream, state).await;
             });
         }
     }
