@@ -6,7 +6,7 @@ pub struct Err(pub String);
 #[derive(Serialize)]
 pub struct Ok(pub String);
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Debug)]
 pub struct MessageContent {
     pub message: String,
     #[serde(rename = "isError")]

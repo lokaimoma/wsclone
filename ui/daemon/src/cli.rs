@@ -25,6 +25,7 @@ pub struct DaemonCli {
 
 impl DaemonCli {
     #[cfg(target_family = "unix")]
+    #[tracing::instrument]
     pub async fn run_server(&self, state: Arc<RwLock<DaemonState>>) -> Result<()> {
         if let Err(e) = std::fs::remove_file(self.socket_file_path.as_path()) {
             return Err(Error::IOError(format!("{} : {}", e, e.kind())));
@@ -45,6 +46,7 @@ impl DaemonCli {
     }
 
     #[cfg(not(target_family = "unix"))]
+    #[tracing::instrument]
     pub async fn run_server(&self, state: Arc<RwLock<DaemonState>>) -> Result<()> {
         let listener = self.get_tcp_socket_listener().await?;
         loop {
@@ -66,6 +68,11 @@ impl DaemonCli {
         let listener = match UnixListener::bind(self.socket_file_path.as_path()) {
             Ok(l) => l,
             Err(e) => {
+                tracing::error!(
+                    "Error creating UNIX socket",
+                    error = e
+                    error_kind = e.kind()
+                );
                 return Err(Error::SocketError(format!("{} | {}", e, e.kind())));
             }
         };
@@ -77,6 +84,11 @@ impl DaemonCli {
         let listener = match TcpListener::bind(format!("{}:{}", self.host, self.port)).await {
             Ok(l) => l,
             Err(e) => {
+                tracing::error!(
+                    "Error creating TCP socket",
+                    error = e
+                    error_kind = e.kind()
+                );
                 return Err(Error::SocketError(format!("{} | {}", e, e.kind())));
             }
         };

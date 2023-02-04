@@ -6,6 +6,7 @@ use tokio::task::JoinHandle;
 use ws_common::command::CloneProp;
 use ws_common::response::MessageContent;
 
+#[derive(Debug)]
 pub struct DaemonState {
     pub queued_links: Vec<CloneProp>,
     pub tx: Sender<Update>,
@@ -16,7 +17,7 @@ pub struct DaemonState {
     pub clones_dir: PathBuf,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FileStatus {
     pub bytes_written: u64,
     pub f_size: Option<u64>,

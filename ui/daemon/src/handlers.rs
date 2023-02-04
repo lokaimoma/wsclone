@@ -1,6 +1,7 @@
 use crate::state::DaemonState;
 use libwsclone::DownloadRule;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio::sync::RwLock;
@@ -9,9 +10,10 @@ use ws_common::ipc_helpers;
 use ws_common::response;
 use ws_common::response::{CloneInfo, CloneStatusResponse, FileUpdate, GetClonesResponse};
 
+#[tracing::instrument]
 pub async fn handle_connection<T>(mut stream: T, app_state: Arc<RwLock<DaemonState>>)
 where
-    T: AsyncRead + AsyncWrite + Send + Unpin,
+    T: AsyncRead + AsyncWrite + Send + Unpin + Debug,
 {
     let cmd = match ipc_helpers::get_payload_content(&mut stream).await {
         Ok(r) => r,
@@ -91,6 +93,7 @@ where
                 let response = match serde_json::to_string(&response) {
                     Ok(v) => v,
                     Err(e) => {
+                        tracing::error!(msg = "Error serializing updates", error = e.to_string());
                         send_err(
                             &mut stream,
                             format!("Error serializing updates to string : {e}"),
@@ -134,6 +137,10 @@ where
             let response = match serde_json::to_string(&response) {
                 Ok(v) => v,
                 Err(e) => {
+                    tracing::error!(
+                        msg = "Error serializing clones information",
+                        error = e.to_string()
+                    );
                     send_err(
                         &mut stream,
                         format!("Error serializing clones information : {e}"),
@@ -174,6 +181,12 @@ where
     let mut dest_dir = app_state.clones_dir.clone();
     dest_dir.push(clone_prop.dir_name);
     if let Err(e) = tokio::fs::create_dir_all(dest_dir.as_path()).await {
+        tracing::error!(
+            "Error creating destination directory for clone",
+            error = e
+            error_kind = e.kind(),
+            clone_dir_name = clone_prop.dir_name
+        );
         send_err(
             &mut stream,
             format!(
