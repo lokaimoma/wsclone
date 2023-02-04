@@ -20,6 +20,7 @@ pub struct DaemonCli {
     pub host: String,
     #[cfg(target_family = "unix")]
     pub socket_file_path: PathBuf,
+    pub clones_dir: PathBuf,
 }
 
 impl DaemonCli {

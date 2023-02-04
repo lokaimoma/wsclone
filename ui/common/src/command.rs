@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -22,7 +22,7 @@ pub struct Command {
 pub struct CloneProp {
     pub session_id: String,
     pub link: String,
-    pub dest_dir: String,
+    pub dir_name: String,
     pub max_static_file_size: u64,
     pub download_static_resource_with_unknown_size: bool,
     /// Progress update interval in millisecond
@@ -36,7 +36,7 @@ pub struct CloneProp {
 }
 
 /// The following structs takes as argument the session id of a clone.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct AbortCloneProp(pub String);
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct CloneStatusProp(pub String);

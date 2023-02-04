@@ -2,6 +2,7 @@ use crate::cli::DaemonCli;
 use crate::state::{DaemonState, FileStatus};
 use clap::Parser;
 use libwsclone::Update;
+use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::channel;
@@ -19,6 +20,12 @@ const MAX_RECEIVER_SLEEP_SECONDS: u64 = 1;
 #[tokio::main]
 async fn main() {
     let daemon_cli = DaemonCli::parse();
+    if !daemon_cli.clones_dir.is_dir() {
+        std::io::stderr()
+            .write(b"Clones directory might not exist or you do not have permission to access it")
+            .unwrap();
+        return;
+    }
     let (tx, mut rx) = channel::<Update>(MAX_CHANNEL_BUFFER_SIZE);
     let state = Arc::new(RwLock::new(DaemonState {
         queued_links: Vec::new(),
@@ -26,6 +33,7 @@ async fn main() {
         current_session_id: None,
         current_session_thread: None,
         current_session_updates: None,
+        clones_dir: daemon_cli.clones_dir.clone(),
     }));
 
     let state_clone = state.clone();

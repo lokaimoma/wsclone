@@ -28,3 +28,17 @@ pub struct FileUpdate {
 pub struct CloneStatusResponse {
     pub updates: Vec<FileUpdate>,
 }
+
+#[derive(Serialize)]
+pub struct GetClonesResponse {
+    pub clones: Vec<CloneInfo>,
+}
+
+#[derive(Serialize)]
+pub struct CloneInfo {
+    pub title: String,
+    //pub size: u64,
+    //pub file_count: u64,
+    //pub pages: u64,
+    //pub errors_occurred: bool,
+}

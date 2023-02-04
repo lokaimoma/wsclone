@@ -1,5 +1,6 @@
 use libwsclone::Update;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 use ws_common::command::CloneProp;
@@ -12,6 +13,7 @@ pub struct DaemonState {
     pub current_session_thread: Option<JoinHandle<()>>,
     /// An optional map of file names to their current download status
     pub current_session_updates: Option<HashMap<String, FileStatus>>,
+    pub clones_dir: PathBuf,
 }
 
 #[derive(Clone)]

@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 use ws_common::command::{AbortCloneProp, CloneProp, CloneStatusProp, Command, CommandType};
 use ws_common::ipc_helpers;
 use ws_common::response;
-use ws_common::response::{CloneStatusResponse, FileUpdate};
+use ws_common::response::{CloneInfo, CloneStatusResponse, FileUpdate, GetClonesResponse};
 
 pub async fn handle_connection<T>(mut stream: T, app_state: Arc<RwLock<DaemonState>>)
 where
@@ -50,6 +50,7 @@ where
             };
             let mut app_state = app_state.write().await;
             app_state.queued_links.push(clone_prop);
+            drop(app_state);
             let response = response::Ok("Clone task queued successfully".to_string());
             let response = serde_json::to_string(&response).unwrap();
             let response = ipc_helpers::payload_to_bytes(&response).unwrap();
@@ -102,7 +103,48 @@ where
                 stream.write_all(&response).await.unwrap();
             }
         }
-        CommandType::GetClones => {}
+        CommandType::GetClones => {
+            let dir = app_state.read().await.clones_dir.clone();
+            // later the results will be cached into the app state
+            let clones: Vec<CloneInfo> = match tokio::fs::read_dir(dir).await {
+                Err(e) => {
+                    send_err(
+                        &mut stream,
+                        format!("Error reading clones directory entries : {e}"),
+                    )
+                    .await;
+                    return;
+                }
+                Ok(mut read_dir) => {
+                    // other info will be taken later. Taking only dir name for now
+                    let mut res: Vec<String> = Vec::new();
+                    while let Ok(Some(entry)) = read_dir.next_entry().await {
+                        if let Ok(f_type) = entry.file_type().await {
+                            if f_type.is_dir() {
+                                res.push(entry.file_name().to_string_lossy().to_string());
+                            }
+                        }
+                    }
+                    res.into_iter()
+                        .map(|entry| CloneInfo { title: entry })
+                        .collect()
+                }
+            };
+            let response = GetClonesResponse { clones };
+            let response = match serde_json::to_string(&response) {
+                Ok(v) => v,
+                Err(e) => {
+                    send_err(
+                        &mut stream,
+                        format!("Error serializing clones information : {e}"),
+                    )
+                    .await;
+                    return;
+                }
+            };
+            let response = ipc_helpers::payload_to_bytes(&response).unwrap();
+            stream.write_all(&response).await.unwrap();
+        }
     }
 }
 
@@ -129,11 +171,25 @@ where
     app_state.current_session_id = Some(clone_prop.session_id.clone());
     app_state.current_session_updates = Some(HashMap::new());
     let tx = app_state.tx.clone();
+    let mut dest_dir = app_state.clones_dir.clone();
+    dest_dir.push(clone_prop.dir_name);
+    if let Err(e) = tokio::fs::create_dir_all(dest_dir.as_path()).await {
+        send_err(
+            &mut stream,
+            format!(
+                "Error creating destination directory {} : {e}",
+                dest_dir.to_string_lossy()
+            ),
+        )
+        .await;
+        return;
+    }
+    let dest_dir = dest_dir.to_string_lossy().to_string();
     let handle = tokio::spawn(async move {
         libwsclone::init_download(
             &clone_prop.session_id,
             &clone_prop.link,
-            &clone_prop.dest_dir,
+            &dest_dir,
             DownloadRule {
                 max_static_file_size: clone_prop.max_static_file_size,
                 download_static_resource_with_unknown_size: clone_prop
@@ -149,6 +205,7 @@ where
         .unwrap();
     });
     app_state.current_session_thread = Some(handle);
+    drop(app_state);
     let response = response::Ok("Clone started successfully".to_string());
     let response = serde_json::to_string(&response).unwrap();
     let response = ipc_helpers::payload_to_bytes(&response).unwrap();
@@ -182,6 +239,7 @@ where
         }
         app_state.current_session_id = None;
     }
+    drop(app_state);
     let response = response::Ok("Abort successful".to_string());
     let response = serde_json::to_string(&response).unwrap();
     let response = ipc_helpers::payload_to_bytes(&response).unwrap();
