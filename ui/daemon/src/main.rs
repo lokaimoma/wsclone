@@ -8,6 +8,7 @@ use std::time::Duration;
 use tokio::sync::mpsc::channel;
 use tokio::sync::RwLock;
 use ws_common::response::MessageContent;
+use std::path::MAIN_SEPARATOR;
 
 mod cli;
 mod error;
@@ -19,6 +20,13 @@ const MAX_RECEIVER_SLEEP_SECONDS: u64 = 1;
 
 #[tokio::main]
 async fn main() {
+    let f_appender = tracing_appender::rolling::hourly(format!(".{MAIN_SEPARATOR}logs{MAIN_SEPARATOR}"), "wsclone.log");
+    let (non_blk, _guard) = tracing_appender::non_blocking(f_appender);
+    tracing_subscriber::fmt()
+        .with_env_filter("libwsclone=debug,daemon=debug")
+        .event_format(tracing_subscriber::fmt::format().pretty())
+        .with_writer(non_blk)
+        .init();
     let daemon_cli = DaemonCli::parse();
     if !daemon_cli.clones_dir.is_dir() {
         let _ = std::io::stderr()

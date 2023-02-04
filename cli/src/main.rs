@@ -6,8 +6,7 @@ mod cli;
 
 #[tokio::main]
 async fn main() {
-    let f_appender =
-        tracing_appender::rolling::hourly(format!(".{}", MAIN_SEPARATOR), "wsclone.log");
+    let f_appender = tracing_appender::rolling::hourly(format!(".{MAIN_SEPARATOR}"), "wsclone.log");
     let (non_blk, _guard) = tracing_appender::non_blocking(f_appender);
     tracing_subscriber::fmt()
         .with_env_filter("libwsclone=debug")
