@@ -2,7 +2,6 @@ use crate::cli::DaemonCli;
 use crate::state::{DaemonState, FileStatus};
 use clap::Parser;
 use libwsclone::Update;
-use std::io::Write;
 use std::path::MAIN_SEPARATOR;
 use std::sync::Arc;
 use std::time::Duration;
@@ -36,9 +35,7 @@ async fn main() {
             msg = "Clones directory might not exist or you do not have permission to access it",
             dir_name = daemon_cli.clones_dir.to_string_lossy().to_string()
         );
-        let _ = std::io::stderr()
-            .write(b"Clones directory might not exist or you do not have permission to access it")
-            .unwrap();
+        eprintln!("Clones directory might not exist or you do not have permission to access it");
         return;
     }
     let (tx, mut rx) = channel::<Update>(MAX_CHANNEL_BUFFER_SIZE);
@@ -104,5 +101,7 @@ async fn main() {
         }
     });
 
-    daemon_cli.run_server(state).await.unwrap();
+    if let Err(e) = daemon_cli.run_server(state).await {
+        eprintln!("{e}");
+    };
 }
