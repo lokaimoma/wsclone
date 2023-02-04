@@ -179,12 +179,12 @@ where
     app_state.current_session_updates = Some(HashMap::new());
     let tx = app_state.tx.clone();
     let mut dest_dir = app_state.clones_dir.clone();
-    dest_dir.push(clone_prop.dir_name);
+    dest_dir.push(&clone_prop.dir_name);
     if let Err(e) = tokio::fs::create_dir_all(dest_dir.as_path()).await {
         tracing::error!(
-            "Error creating destination directory for clone",
-            error = e
-            error_kind = e.kind(),
+            msg = "Error creating destination directory for clone",
+            error = e.to_string(),
+            error_kind = e.kind().to_string(),
             clone_dir_name = clone_prop.dir_name
         );
         send_err(
