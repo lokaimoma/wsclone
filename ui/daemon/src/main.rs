@@ -2,6 +2,7 @@ use crate::cli::DaemonCli;
 use crate::state::{DaemonState, FileStatus};
 use clap::Parser;
 use libwsclone::Update;
+use std::fs;
 use std::path::MAIN_SEPARATOR;
 use std::sync::Arc;
 use std::time::Duration;
@@ -29,15 +30,28 @@ async fn main() {
         .event_format(tracing_subscriber::fmt::format().pretty())
         .with_writer(non_blk)
         .init();
-    let daemon_cli = DaemonCli::parse();
+    let mut daemon_cli = DaemonCli::parse();
     if !daemon_cli.clones_dir.is_dir() {
         tracing::error!(
             msg = "Clones directory might not exist or you do not have permission to access it",
-            dir_name = daemon_cli.clones_dir.to_string_lossy().to_string()
+            dir = daemon_cli.clones_dir.to_string_lossy().to_string()
         );
         eprintln!("Clones directory might not exist or you do not have permission to access it");
         return;
     }
+    daemon_cli.clones_dir = match fs::canonicalize(&daemon_cli.clones_dir) {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::error!(
+                msg = "Canonicalization of clones directory failed",
+                dir = daemon_cli.clones_dir.to_string_lossy().to_string(),
+                error = e.to_string(),
+                error_kind = e.kind().to_string()
+            );
+            eprintln!("Canonicalization of clones directory failed");
+            return;
+        }
+    };
     let (tx, mut rx) = channel::<Update>(MAX_CHANNEL_BUFFER_SIZE);
     let state = Arc::new(RwLock::new(DaemonState {
         queued_links: Vec::new(),

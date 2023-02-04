@@ -70,7 +70,7 @@ where
             };
             let mut state = app_state.write().await;
             if state.current_session_id.is_some()
-                && state.current_session_id.as_ref().unwrap() != &prop.0
+                && state.current_session_id.as_ref().unwrap() != &prop.session_id
             {
                 send_err(&mut stream, "Incorrect session id".to_string()).await;
                 return;
@@ -243,7 +243,7 @@ where
 
     let mut app_state = app_state.write().await;
     if app_state.current_session_id.is_some()
-        && app_state.current_session_id.as_ref().unwrap() == &abort_clone_prop.0
+        && app_state.current_session_id.as_ref().unwrap() == &abort_clone_prop.session_id
     {
         if let Some(session_thread) = &app_state.current_session_thread {
             session_thread.abort();

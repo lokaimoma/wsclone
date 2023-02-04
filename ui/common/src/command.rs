@@ -43,8 +43,14 @@ pub struct CloneProp {
     pub abort_on_download_error: bool,
 }
 
-/// The following structs takes as argument the session id of a clone.
 #[derive(Debug, Deserialize)]
-pub struct AbortCloneProp(pub String);
+pub struct AbortCloneProp {
+    #[serde(rename(deserialize = "sessionId"))]
+    pub session_id: String,
+}
+
 #[derive(Debug, Deserialize)]
-pub struct CloneStatusProp(pub String);
+pub struct CloneStatusProp {
+    #[serde(rename(deserialize = "sessionId"))]
+    pub session_id: String,
+}

@@ -1,15 +1,15 @@
 use crate::error::{Error, Result};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 
-const PAYLOAD_SIZE_INFO_LENGTH: usize = 4;
+const PAYLOAD_SIZE_INFO_LENGTH: usize = 10;
 
 /// This extracts the message from the bytes received from the stream.
 /// The required structure of the bytes when parsed to string should
-/// be as follows size of the message expressed as 4 digits. So if the
+/// be as follows size of the message expressed as 10 digits. So if the
 /// message size is 4 bytes then the size is 0004, followed by the
 /// message we want to send. An example of such expected payload will be
-/// 0005hello. With the size of "hello" being 5 hence 0005 followed by the
-/// the message "hello".
+/// 0000000005hello. With the size of "hello" being 5 hence
+/// 0000000005 followed by the message "hello".
 pub async fn get_payload_content<T>(stream: &mut T) -> Result<String>
 where
     T: AsyncRead + AsyncWrite + Unpin,
@@ -23,15 +23,13 @@ where
             Ok(n) => n,
             Err(_) => {
                 return Err(Error::InvalidPayload(format!(
-                    "First {} bytes weren't a correct integer",
-                    PAYLOAD_SIZE_INFO_LENGTH
+                    "First {PAYLOAD_SIZE_INFO_LENGTH} bytes weren't a correct integer"
                 )));
             }
         },
         Err(_) => {
             return Err(Error::InvalidPayload(format!(
-                "First {} bytes weren't a valid UTF-8 string",
-                PAYLOAD_SIZE_INFO_LENGTH
+                "First {PAYLOAD_SIZE_INFO_LENGTH} bytes weren't a valid UTF-8 string",
             )));
         }
     };
@@ -49,7 +47,7 @@ where
 
 pub fn payload_to_bytes(message: &str) -> Result<Vec<u8>> {
     let payload_size = message.len().to_string();
-    let mut payload = "0000"[0..PAYLOAD_SIZE_INFO_LENGTH - payload_size.len()].to_owned();
+    let mut payload = "0000000000"[0..PAYLOAD_SIZE_INFO_LENGTH - payload_size.len()].to_owned();
     payload.push_str(&payload_size);
     payload.push_str(message);
     Ok(Vec::from(payload.as_bytes()))
