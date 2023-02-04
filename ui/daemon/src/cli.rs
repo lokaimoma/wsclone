@@ -28,8 +28,12 @@ impl DaemonCli {
     #[tracing::instrument]
     pub async fn run_server(&self, state: Arc<RwLock<DaemonState>>) -> Result<()> {
         if let Err(e) = std::fs::remove_file(self.socket_file_path.as_path()) {
-            if !e.kind().to_string().contains("No such file or directory") {
-                return Err(Error::IOError(format!("{} : {}", e, e.kind())));
+            if !e.to_string().contains("No such file or directory") {
+                return Err(Error::IOError(format!(
+                    "{e} : {}\nFile : {}",
+                    e.kind(),
+                    self.socket_file_path.to_string_lossy()
+                )));
             }
         };
         let listener = self.get_unix_socket_listener()?;
