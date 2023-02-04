@@ -1,11 +1,12 @@
 use crate::cli::DaemonCli;
-use crate::state::{DaemonState, FileStatus, MessageContent};
+use crate::state::{DaemonState, FileStatus};
 use clap::Parser;
 use libwsclone::Update;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::channel;
 use tokio::sync::RwLock;
+use ws_common::response::MessageContent;
 
 mod cli;
 mod error;
@@ -47,7 +48,7 @@ async fn main() {
 
                     *f_update = FileStatus {
                         bytes_written: update.get_bytes_written().unwrap_or(f_update.bytes_written),
-                        f_size: update.get_file_size().unwrap_or(f_update.f_size),
+                        f_size: update.get_file_size(),
                         message: if update.get_message().is_some() {
                             Some(MessageContent {
                                 message: update.get_message().unwrap().to_string(),
@@ -62,7 +63,7 @@ async fn main() {
                         update.get_resource_name().to_string(),
                         FileStatus {
                             bytes_written: update.get_bytes_written().unwrap_or(0),
-                            f_size: update.get_file_size().unwrap_or(0),
+                            f_size: update.get_file_size(),
                             message: if update.get_message().is_some() {
                                 Some(MessageContent {
                                     message: update.get_message().unwrap().to_string(),

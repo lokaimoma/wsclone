@@ -4,9 +4,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio::sync::RwLock;
-use ws_common::command::{AbortCloneProp, CloneProp, Command, CommandType};
+use ws_common::command::{AbortCloneProp, CloneProp, CloneStatusProp, Command, CommandType};
 use ws_common::ipc_helpers;
 use ws_common::response;
+use ws_common::response::{CloneStatusResponse, FileUpdate};
 
 pub async fn handle_connection<T>(mut stream: T, app_state: Arc<RwLock<DaemonState>>)
 where
@@ -25,7 +26,7 @@ where
         Err(e) => {
             send_err(
                 &mut stream,
-                format!("Error parsing payload to command type : {}", e),
+                format!("Error parsing payload to command type : {e}"),
             )
             .await;
             return;
@@ -43,7 +44,7 @@ where
             let clone_prop: CloneProp = match serde_json::from_str(&cmd.props) {
                 Ok(v) => v,
                 Err(e) => {
-                    send_err(&mut stream, format!("Invalid clone prop payload : {}", e)).await;
+                    send_err(&mut stream, format!("Invalid clone prop payload : {e}")).await;
                     return;
                 }
             };
@@ -56,7 +57,52 @@ where
         }
         CommandType::Clone => handle_clone(stream, app_state, cmd).await,
         CommandType::AbortClone => handle_abort_clone(&mut stream, app_state, cmd).await,
-        _ => send_err(&mut stream, "Command not implemented yet".to_string()).await,
+        CommandType::CloneStatus => {
+            let prop: CloneStatusProp = match serde_json::from_str(&cmd.props) {
+                Ok(v) => v,
+                Err(e) => {
+                    send_err(&mut stream, format!("Invalid clone status prop : {e}")).await;
+                    return;
+                }
+            };
+            let mut state = app_state.write().await;
+            if state.current_session_id.is_some()
+                && state.current_session_id.as_ref().unwrap() != &prop.0
+            {
+                send_err(&mut stream, "Incorrect session id".to_string()).await;
+                return;
+            }
+            if state.current_session_updates.is_some() {
+                let updates = state.current_session_updates.clone();
+                state.current_session_updates = Some(HashMap::new());
+                drop(state);
+                let updates = updates.unwrap();
+                let updates = updates
+                    .into_iter()
+                    .map(|(file_name, status)| FileUpdate {
+                        file_name,
+                        bytes_written: status.bytes_written,
+                        file_size: status.f_size,
+                        message: status.message,
+                    })
+                    .collect();
+                let response = CloneStatusResponse { updates };
+                let response = match serde_json::to_string(&response) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        send_err(
+                            &mut stream,
+                            format!("Error serializing updates to string : {e}"),
+                        )
+                        .await;
+                        return;
+                    }
+                };
+                let response = ipc_helpers::payload_to_bytes(&response).unwrap();
+                stream.write_all(&response).await.unwrap();
+            }
+        }
+        CommandType::GetClones => {}
     }
 }
 
@@ -76,7 +122,7 @@ where
     let clone_prop: CloneProp = match serde_json::from_str(&cmd.props) {
         Ok(v) => v,
         Err(e) => {
-            send_err(stream, format!("Invalid clone prop payload : {}", e)).await;
+            send_err(stream, format!("Invalid clone prop payload : {e}")).await;
             return;
         }
     };
@@ -118,7 +164,7 @@ where
         Err(e) => {
             send_err(
                 stream,
-                format!("Error parsing props as an AbortCloneProp : {}", e),
+                format!("Error parsing props as an AbortCloneProp : {e}"),
             )
             .await;
             return;

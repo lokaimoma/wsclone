@@ -556,6 +556,7 @@ dependencies = [
  "clap",
  "common",
  "libwsclone",
+ "serde",
  "serde_json",
  "tokio",
 ]

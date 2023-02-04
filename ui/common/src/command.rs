@@ -4,11 +4,11 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CommandType {
     Clone,
-    CloneStatus,
     HealthCheck,
     GetClones,
     AbortClone,
     QueueClone,
+    CloneStatus,
 }
 
 #[derive(Debug, Deserialize)]
@@ -36,7 +36,7 @@ pub struct CloneProp {
 }
 
 /// The following structs takes as argument the session id of a clone.
-#[derive(Debug, Deserialize)]
-pub struct CloneStatusProp(String);
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AbortCloneProp(pub String);
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CloneStatusProp(pub String);

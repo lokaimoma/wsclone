@@ -3,9 +3,10 @@ use std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 use ws_common::command::CloneProp;
+use ws_common::response::MessageContent;
 
 pub struct DaemonState {
-    pub(crate) queued_links: Vec<CloneProp>,
+    pub queued_links: Vec<CloneProp>,
     pub tx: Sender<Update>,
     pub current_session_id: Option<String>,
     pub current_session_thread: Option<JoinHandle<()>>,
@@ -13,14 +14,9 @@ pub struct DaemonState {
     pub current_session_updates: Option<HashMap<String, FileStatus>>,
 }
 
+#[derive(Clone)]
 pub struct FileStatus {
-    pub(crate) bytes_written: u64,
-    pub(crate) f_size: u64,
-    pub(crate) message: Option<MessageContent>,
-}
-
-#[derive(Debug, Clone)]
-pub struct MessageContent {
-    pub(crate) message: String,
-    pub(crate) is_error: bool,
+    pub bytes_written: u64,
+    pub f_size: Option<u64>,
+    pub message: Option<MessageContent>,
 }
