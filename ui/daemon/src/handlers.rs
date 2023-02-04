@@ -248,7 +248,7 @@ where
 
 async fn send_err<T>(mut stream: T, msg: String)
 where
-    T: AsyncRead + AsyncWrite + Send + Unpin,
+    T: AsyncWrite + Send + Unpin,
 {
     let err = response::Err(msg);
     let bytes = ipc_helpers::payload_to_bytes(&serde_json::to_string(&err).unwrap()).unwrap();

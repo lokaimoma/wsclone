@@ -14,9 +14,6 @@ async fn main() {
         .event_format(tracing_subscriber::fmt::format().pretty())
         .with_writer(non_blk)
         .init();
-    // pretty_env_logger::formatted_builder()
-    //     .filter(Some("wsclone"), log::LevelFilter::Trace)
-    //     .init();
     let cli = cli::Cli::parse();
     download(cli).await;
 }

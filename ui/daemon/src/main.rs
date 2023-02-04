@@ -21,7 +21,7 @@ const MAX_RECEIVER_SLEEP_SECONDS: u64 = 1;
 async fn main() {
     let daemon_cli = DaemonCli::parse();
     if !daemon_cli.clones_dir.is_dir() {
-        std::io::stderr()
+        let _ = std::io::stderr()
             .write(b"Clones directory might not exist or you do not have permission to access it")
             .unwrap();
         return;

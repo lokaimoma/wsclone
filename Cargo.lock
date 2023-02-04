@@ -559,6 +559,8 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tracing-appender",
+ "tracing-subscriber",
 ]
 
 [[package]]
