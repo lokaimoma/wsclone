@@ -60,99 +60,118 @@ where
         }
         CommandType::Clone => handle_clone(stream, daemon_state, cmd).await,
         CommandType::AbortClone => handle_abort_clone(&mut stream, daemon_state, cmd).await,
-        CommandType::CloneStatus => {
-            let prop: CloneStatusProp = match serde_json::from_str(&cmd.props) {
-                Ok(v) => v,
-                Err(e) => {
-                    send_err(&mut stream, format!("Invalid clone status prop : {e}")).await;
-                    return;
-                }
-            };
-            let mut state = daemon_state.write().await;
-            if state.current_session_id.is_some()
-                && state.current_session_id.as_ref().unwrap() != &prop.session_id
-            {
-                send_err(&mut stream, "Incorrect session id".to_string()).await;
+        CommandType::CloneStatus => handle_get_clone_status(&mut stream, &daemon_state, &cmd).await,
+        CommandType::GetClones => handle_get_clones(&mut stream, daemon_state).await,
+    }
+}
+
+async fn handle_get_clone_status<T>(
+    mut stream: &mut T,
+    daemon_state: &Arc<RwLock<DaemonState>>,
+    cmd: &Command,
+) where
+    T: AsyncWrite + Send + Unpin,
+{
+    let prop: CloneStatusProp = match serde_json::from_str(&cmd.props) {
+        Ok(v) => v,
+        Err(e) => {
+            send_err(&mut stream, format!("Invalid clone status prop : {e}")).await;
+            return;
+        }
+    };
+    let mut state = daemon_state.write().await;
+    if state.current_session_id.is_some()
+        && state.current_session_id.as_ref().unwrap() != &prop.session_id
+    {
+        send_err(&mut stream, "Incorrect session id".to_string()).await;
+        return;
+    }
+    if state.current_session_updates.is_some() {
+        let updates = state.current_session_updates.clone();
+        if state.current_session_thread.is_some() {
+            state.current_session_updates = Some(HashMap::new());
+        } else {
+            state.current_session_thread = None;
+            state.current_session_id = None;
+            state.current_session_updates = None;
+        }
+        drop(state);
+        let updates = updates.unwrap();
+        let updates = updates
+            .into_iter()
+            .map(|(file_name, status)| FileUpdate {
+                file_name,
+                bytes_written: status.bytes_written,
+                file_size: status.f_size,
+                message: status.message,
+            })
+            .collect();
+        let response = CloneStatusResponse { updates };
+        let response = match serde_json::to_string(&response) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!(msg = "Error serializing updates", error = e.to_string());
+                send_err(
+                    &mut stream,
+                    format!("Error serializing updates to string : {e}"),
+                )
+                .await;
                 return;
             }
-            if state.current_session_updates.is_some() {
-                let updates = state.current_session_updates.clone();
-                state.current_session_updates = Some(HashMap::new());
-                drop(state);
-                let updates = updates.unwrap();
-                let updates = updates
-                    .into_iter()
-                    .map(|(file_name, status)| FileUpdate {
-                        file_name,
-                        bytes_written: status.bytes_written,
-                        file_size: status.f_size,
-                        message: status.message,
-                    })
-                    .collect();
-                let response = CloneStatusResponse { updates };
-                let response = match serde_json::to_string(&response) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        tracing::error!(msg = "Error serializing updates", error = e.to_string());
-                        send_err(
-                            &mut stream,
-                            format!("Error serializing updates to string : {e}"),
-                        )
-                        .await;
-                        return;
-                    }
-                };
-                let response = ipc_helpers::payload_to_bytes(&response).unwrap();
-                stream.write_all(&response).await.unwrap();
-            }
-        }
-        CommandType::GetClones => {
-            let dir = daemon_state.read().await.clones_dir.clone();
-            // later the results will be cached into the app state
-            let clones: Vec<CloneInfo> = match tokio::fs::read_dir(dir).await {
-                Err(e) => {
-                    send_err(
-                        &mut stream,
-                        format!("Error reading clones directory entries : {e}"),
-                    )
-                    .await;
-                    return;
-                }
-                Ok(mut read_dir) => {
-                    // other info will be taken later. Taking only dir name for now
-                    let mut res: Vec<String> = Vec::new();
-                    while let Ok(Some(entry)) = read_dir.next_entry().await {
-                        if let Ok(f_type) = entry.file_type().await {
-                            if f_type.is_dir() {
-                                res.push(entry.file_name().to_string_lossy().to_string());
-                            }
-                        }
-                    }
-                    res.into_iter()
-                        .map(|entry| CloneInfo { title: entry })
-                        .collect()
-                }
-            };
-            let response = GetClonesResponse { clones };
-            let response = match serde_json::to_string(&response) {
-                Ok(v) => v,
-                Err(e) => {
-                    tracing::error!(
-                        msg = "Error serializing clones information",
-                        error = e.to_string()
-                    );
-                    send_err(
-                        &mut stream,
-                        format!("Error serializing clones information : {e}"),
-                    )
-                    .await;
-                    return;
-                }
-            };
-            let response = ipc_helpers::payload_to_bytes(&response).unwrap();
-            stream.write_all(&response).await.unwrap();
-        }
+        };
+        let response = ipc_helpers::payload_to_bytes(&response).unwrap();
+        stream.write_all(&response).await.unwrap();
     }
+}
+
+async fn handle_get_clones<T>(mut stream: &mut T, daemon_state: Arc<RwLock<DaemonState>>)
+where
+    T: AsyncWrite + Send + Unpin,
+{
+    let dir = daemon_state.read().await.clones_dir.clone();
+    // later the results will be cached into the app state
+    let clones: Vec<CloneInfo> = match tokio::fs::read_dir(dir).await {
+        Err(e) => {
+            send_err(
+                &mut stream,
+                format!("Error reading clones directory entries : {e}"),
+            )
+            .await;
+            return;
+        }
+        Ok(mut read_dir) => {
+            // other info will be taken later. Taking only dir name for now
+            let mut res: Vec<String> = Vec::new();
+            while let Ok(Some(entry)) = read_dir.next_entry().await {
+                if let Ok(f_type) = entry.file_type().await {
+                    if f_type.is_dir() {
+                        res.push(entry.file_name().to_string_lossy().to_string());
+                    }
+                }
+            }
+            res.into_iter()
+                .map(|entry| CloneInfo { title: entry })
+                .collect()
+        }
+    };
+    let response = GetClonesResponse { clones };
+    let response = match serde_json::to_string(&response) {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::error!(
+                msg = "Error serializing clones information",
+                error = e.to_string()
+            );
+            send_err(
+                &mut stream,
+                format!("Error serializing clones information : {e}"),
+            )
+            .await;
+            return;
+        }
+    };
+    let response = ipc_helpers::payload_to_bytes(&response).unwrap();
+    stream.write_all(&response).await.unwrap();
 }
 
 async fn handle_clone<T>(mut stream: T, daemon_state: Arc<RwLock<DaemonState>>, cmd: Command)
@@ -244,7 +263,7 @@ where
     };
 
     let mut app_state = app_state.write().await;
-    if app_state.current_session_id.is_some()
+    if app_state.current_session_thread.is_some()
         && app_state.current_session_id.as_ref().unwrap() == &abort_clone_prop.session_id
     {
         if let Some(session_thread) = &app_state.current_session_thread {
