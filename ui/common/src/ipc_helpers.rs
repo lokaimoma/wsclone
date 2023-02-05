@@ -1,6 +1,11 @@
 use crate::error::{Error, Result};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 
+const PAYLOAD_SIZE_INFO_LENGTH: usize = 8;
+
+/// Converts the bytes from our stream into a string(The payload).
+/// The first byte should be the hexadecimal representation
+/// of the size of the message.
 pub async fn get_payload_content<T>(stream: &mut T) -> Result<String>
 where
     T: AsyncRead + AsyncWrite + Unpin,
@@ -10,7 +15,7 @@ where
         return Err(Error::ErrorReadingMessage(format!("{} : {}", e, e.kind())));
     }
     let buf_size = match String::from_utf8(payload_size_buffer) {
-        Ok(v) => match v.parse::<u16>() {
+        Ok(v) => match usize::from_str_radix(&v, 16) {
             Ok(n) => n,
             Err(_) => {
                 return Err(Error::InvalidPayload(format!(
@@ -24,7 +29,7 @@ where
             )));
         }
     };
-    let mut payload_buf: Vec<u8> = Vec::with_capacity(buf_size.into());
+    let mut payload_buf: Vec<u8> = Vec::with_capacity(buf_size);
     if let Err(e) = stream.read_buf(&mut payload_buf).await {
         return Err(Error::ErrorReadingMessage(format!("{} : {}", e, e.kind())));
     }
@@ -36,10 +41,13 @@ where
     }
 }
 
+/// Primarily converts our message into bytes, the first
+/// byte is the hexadecimal representation of the size
+/// of the message followed by the message(in bytes).
 pub fn payload_to_bytes(message: &str) -> Result<Vec<u8>> {
-    let payload_size = message.len().to_string();
-    let mut payload = "0000000000"[0..PAYLOAD_SIZE_INFO_LENGTH - payload_size.len()].to_owned();
-    payload.push_str(&payload_size);
+    let msg_len = format!("{:x}", message.len());
+    let mut payload = "00000000"[0..PAYLOAD_SIZE_INFO_LENGTH - msg_len.len()].to_owned();
+    payload.push_str(&msg_len);
     payload.push_str(message);
     Ok(Vec::from(payload.as_bytes()))
 }
