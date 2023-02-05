@@ -277,10 +277,7 @@ async fn download_page_with_static_resources(
                             update_tx
                                 .send(Update::MessageUpdate(Message {
                                     session_id: prop.session_id.clone(),
-                                    content: format!(
-                                        "Error reading file for resource links. {}",
-                                        e
-                                    ),
+                                    content: format!("Error reading file for resource links. {e}"),
                                     resource_name: "".to_string(),
                                     is_error: false,
                                 }))

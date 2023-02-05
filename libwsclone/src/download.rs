@@ -215,7 +215,7 @@ pub async fn download_file(
                         session_id,
                         resource_name: f_name,
                         is_error: true,
-                        content: format!("Error status code : {}", status),
+                        content: format!("Error status code : {status}"),
                     }))
                     .await)
                     .is_err()
@@ -338,7 +338,7 @@ fn get_file_name(dld_item: &DownloadItem, headers: &HeaderMap, f_ext: &str) -> S
         }
     }
     if !file_name.contains(f_ext) {
-        file_name = format!("{}{}", file_name, f_ext);
+        file_name = format!("{file_name}{f_ext}");
     }
     file_name
 }

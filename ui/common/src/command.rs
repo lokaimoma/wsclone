@@ -7,7 +7,6 @@ pub enum CommandType {
     HealthCheck,
     GetClones,
     AbortClone,
-    QueueClone,
     CloneStatus,
 }
 

@@ -10,11 +10,11 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let msg = match self {
             Self::ErrorReadingMessage(reason) => {
-                format!("Error reading message from stream for reason : {}", reason)
+                format!("Error reading message from stream for reason : {reason}")
             }
             Self::InvalidPayload(reason) => reason.to_string(),
         };
-        write!(f, "{}", msg)
+        write!(f, "{msg}")
     }
 }
 

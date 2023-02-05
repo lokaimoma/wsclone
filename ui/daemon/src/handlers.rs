@@ -42,22 +42,6 @@ where
                 ipc_helpers::payload_to_bytes(&serde_json::to_string(&payload).unwrap()).unwrap();
             stream.write_all(&payload).await.unwrap();
         }
-        CommandType::QueueClone => {
-            let clone_prop: CloneProp = match serde_json::from_str(&cmd.props) {
-                Ok(v) => v,
-                Err(e) => {
-                    send_err(&mut stream, format!("Invalid clone prop payload : {e}")).await;
-                    return;
-                }
-            };
-            let mut app_state = daemon_state.write().await;
-            app_state.queued_links.push(clone_prop);
-            drop(app_state);
-            let response = response::Ok("Clone task queued successfully".to_string());
-            let response = serde_json::to_string(&response).unwrap();
-            let response = ipc_helpers::payload_to_bytes(&response).unwrap();
-            stream.write_all(&response).await.unwrap();
-        }
         CommandType::Clone => handle_clone(stream, daemon_state, cmd).await,
         CommandType::AbortClone => handle_abort_clone(&mut stream, daemon_state, cmd).await,
         CommandType::CloneStatus => handle_get_clone_status(&mut stream, &daemon_state, &cmd).await,
