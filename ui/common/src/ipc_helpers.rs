@@ -1,15 +1,6 @@
 use crate::error::{Error, Result};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 
-const PAYLOAD_SIZE_INFO_LENGTH: usize = 10;
-
-/// This extracts the message from the bytes received from the stream.
-/// The required structure of the bytes when parsed to string should
-/// be as follows size of the message expressed as 10 digits. So if the
-/// message size is 4 bytes then the size is 0004, followed by the
-/// message we want to send. An example of such expected payload will be
-/// 0000000005hello. With the size of "hello" being 5 hence
-/// 0000000005 followed by the message "hello".
 pub async fn get_payload_content<T>(stream: &mut T) -> Result<String>
 where
     T: AsyncRead + AsyncWrite + Unpin,
