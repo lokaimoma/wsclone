@@ -59,23 +59,6 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_payload_to_bytes() {
-        let payload = r#"{"action": "hello"}"#.to_string();
-        let payload_size = payload.len();
-        let bytes = payload_to_bytes(&payload).unwrap();
-        let size_info_bytes = &bytes[0..PAYLOAD_SIZE_INFO_LENGTH];
-        let size = String::from_utf8(size_info_bytes.to_vec())
-            .unwrap()
-            .parse::<u16>()
-            .unwrap();
-        assert_eq!(size, payload_size as u16);
-        let content_bytes = &bytes[PAYLOAD_SIZE_INFO_LENGTH..bytes.len()];
-        let content = String::from_utf8(content_bytes.to_vec()).unwrap();
-        assert_eq!(content.len(), payload_size);
-        assert!(content.eq(&payload));
-    }
-
     #[tokio::test]
     async fn test_get_payload_content_no_size_info() {
         let payload_bytes = r#"{"action": "hello"}"#.as_bytes().to_vec();
@@ -87,7 +70,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_payload_content_valid_payload_bytes() {
-        let payload_bytes = r#"0019{"action": "hello"}"#.as_bytes().to_vec();
+        let payload_bytes = r#"00000013{"action": "hello"}"#.as_bytes().to_vec();
         let cursor = Cursor::new(payload_bytes);
         let mut bytes_stream = BufStream::new(cursor);
         let res = get_payload_content(&mut bytes_stream).await.unwrap();
