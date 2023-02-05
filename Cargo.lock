@@ -363,6 +363,7 @@ dependencies = [
 name = "common"
 version = "0.1.0"
 dependencies = [
+ "byteorder",
  "serde",
  "serde_json",
  "tokio",
@@ -553,7 +554,6 @@ dependencies = [
 name = "daemon"
 version = "0.1.0"
 dependencies = [
- "byteorder",
  "clap",
  "common",
  "libwsclone",
