@@ -11,10 +11,15 @@ pub enum CommandType {
     CloneStatus,
 }
 
+fn default_prop() -> String {
+    "".into()
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Command {
     #[serde(rename(deserialize = "type"))]
     pub type_: CommandType,
+    #[serde(default = "default_prop")]
     pub props: String,
 }
 
