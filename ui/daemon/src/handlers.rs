@@ -11,7 +11,7 @@ use ws_common::response;
 use ws_common::response::{CloneInfo, CloneStatusResponse, FileUpdate, GetClonesResponse};
 
 #[tracing::instrument]
-pub async fn handle_connection<T>(mut stream: T, app_state: Arc<RwLock<DaemonState>>)
+pub async fn handle_connection<T>(mut stream: T, daemon_state: Arc<RwLock<DaemonState>>)
 where
     T: AsyncRead + AsyncWrite + Send + Unpin + Debug,
 {
@@ -50,7 +50,7 @@ where
                     return;
                 }
             };
-            let mut app_state = app_state.write().await;
+            let mut app_state = daemon_state.write().await;
             app_state.queued_links.push(clone_prop);
             drop(app_state);
             let response = response::Ok("Clone task queued successfully".to_string());
@@ -58,8 +58,8 @@ where
             let response = ipc_helpers::payload_to_bytes(&response).unwrap();
             stream.write_all(&response).await.unwrap();
         }
-        CommandType::Clone => handle_clone(stream, app_state, cmd).await,
-        CommandType::AbortClone => handle_abort_clone(&mut stream, app_state, cmd).await,
+        CommandType::Clone => handle_clone(stream, daemon_state, cmd).await,
+        CommandType::AbortClone => handle_abort_clone(&mut stream, daemon_state, cmd).await,
         CommandType::CloneStatus => {
             let prop: CloneStatusProp = match serde_json::from_str(&cmd.props) {
                 Ok(v) => v,
@@ -68,7 +68,7 @@ where
                     return;
                 }
             };
-            let mut state = app_state.write().await;
+            let mut state = daemon_state.write().await;
             if state.current_session_id.is_some()
                 && state.current_session_id.as_ref().unwrap() != &prop.session_id
             {
@@ -107,7 +107,7 @@ where
             }
         }
         CommandType::GetClones => {
-            let dir = app_state.read().await.clones_dir.clone();
+            let dir = daemon_state.read().await.clones_dir.clone();
             // later the results will be cached into the app state
             let clones: Vec<CloneInfo> = match tokio::fs::read_dir(dir).await {
                 Err(e) => {
@@ -155,12 +155,12 @@ where
     }
 }
 
-async fn handle_clone<T>(mut stream: T, app_state: Arc<RwLock<DaemonState>>, cmd: Command)
+async fn handle_clone<T>(mut stream: T, daemon_state: Arc<RwLock<DaemonState>>, cmd: Command)
 where
     T: AsyncRead + AsyncWrite + Send + Unpin,
 {
-    let mut app_state = app_state.write().await;
-    if app_state.current_session_id.is_some() {
+    let mut app_state = daemon_state.write().await;
+    if app_state.current_session_thread.is_some() {
         let response =
             response::Err("A clone task is already running in the background".to_string());
         let response = serde_json::to_string(&response).unwrap();
@@ -198,6 +198,7 @@ where
         return;
     }
     let dest_dir = dest_dir.to_string_lossy().to_string();
+    let daemon_state = daemon_state.clone();
     let handle = tokio::spawn(async move {
         libwsclone::init_download(
             &clone_prop.session_id,
@@ -216,6 +217,7 @@ where
         )
         .await
         .unwrap();
+        daemon_state.write().await.current_session_thread = None;
     });
     app_state.current_session_thread = Some(handle);
     drop(app_state);
