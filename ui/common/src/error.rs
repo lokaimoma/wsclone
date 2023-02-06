@@ -4,6 +4,7 @@ use std::fmt::Formatter;
 pub enum Error {
     InvalidPayload(String),
     ErrorReadingMessage(String),
+    SerializationError(String)
 }
 
 impl std::fmt::Display for Error {
@@ -13,6 +14,7 @@ impl std::fmt::Display for Error {
                 format!("Error reading message from stream for reason : {reason}")
             }
             Self::InvalidPayload(reason) => reason.to_string(),
+            Self::SerializationError(reason) => reason.to_string()
         };
         write!(f, "{msg}")
     }

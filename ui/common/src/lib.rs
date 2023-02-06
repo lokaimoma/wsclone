@@ -6,10 +6,10 @@ pub mod ipc_helpers;
 pub mod response;
 
 pub trait Payload {
-    fn from_str<'a, T>(payload: &'a str) -> error::Result<T>
+    fn from_str<'a>(payload: &'a str) -> error::Result<Self>
     where
-        T: Deserialize<'a>;
-    fn to_bytes<T>(&self) -> error::Result<Vec<u8>>
+        Self: Deserialize<'a>;
+    fn to_bytes(&self) -> error::Result<Vec<u8>>
     where
-        T: Serialize;
+        Self: Serialize;
 }
