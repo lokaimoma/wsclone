@@ -15,42 +15,50 @@ pub async fn handle_connection<T>(mut stream: T, daemon_state: Arc<RwLock<Daemon
 where
     T: AsyncRead + AsyncWrite + Send + Unpin + Debug,
 {
-    let cmd = match ipc_helpers::get_payload_content(&mut stream).await {
-        Ok(r) => r,
-        Err(e) => {
-            send_err(&mut stream, e.to_string()).await;
-            return;
-        }
-    };
+    let mut keep_alive = true;
+    while keep_alive {
+        let cmd = match ipc_helpers::get_payload_content(&mut stream).await {
+            Ok(r) => r,
+            Err(e) => {
+                send_err(&mut stream, e.to_string()).await;
+                return;
+            }
+        };
 
-    let cmd: Command = match serde_json::from_str(&cmd) {
-        Ok(r) => r,
-        Err(e) => {
-            send_err(
-                &mut stream,
-                format!("Error parsing payload to command type : {e}"),
-            )
-            .await;
-            return;
-        }
-    };
+        let cmd: Command = match serde_json::from_str(&cmd) {
+            Ok(r) => r,
+            Err(e) => {
+                send_err(
+                    &mut stream,
+                    format!("Error parsing payload to command type : {e}"),
+                )
+                .await;
+                return;
+            }
+        };
 
-    match cmd.type_ {
-        CommandType::HealthCheck => {
-            let payload = response::Ok("Alive".to_string());
-            let payload =
-                ipc_helpers::payload_to_bytes(&serde_json::to_string(&payload).unwrap()).unwrap();
-            stream.write_all(&payload).await.unwrap();
+        keep_alive = cmd.keep_alive;
+
+        match cmd.type_ {
+            CommandType::HealthCheck => {
+                let payload = response::Ok("Alive".to_string());
+                let payload =
+                    ipc_helpers::payload_to_bytes(&serde_json::to_string(&payload).unwrap())
+                        .unwrap();
+                stream.write_all(&payload).await.unwrap();
+            }
+            CommandType::Clone => handle_clone(&mut stream, &daemon_state, cmd).await,
+            CommandType::AbortClone => handle_abort_clone(&mut stream, &daemon_state, cmd).await,
+            CommandType::CloneStatus => {
+                handle_get_clone_status(&mut stream, &daemon_state, &cmd).await
+            }
+            CommandType::GetClones => handle_get_clones(&mut stream, &daemon_state).await,
         }
-        CommandType::Clone => handle_clone(stream, daemon_state, cmd).await,
-        CommandType::AbortClone => handle_abort_clone(&mut stream, daemon_state, cmd).await,
-        CommandType::CloneStatus => handle_get_clone_status(&mut stream, &daemon_state, &cmd).await,
-        CommandType::GetClones => handle_get_clones(&mut stream, daemon_state).await,
     }
 }
 
 async fn handle_get_clone_status<T>(
-    mut stream: &mut T,
+    stream: &mut T,
     daemon_state: &Arc<RwLock<DaemonState>>,
     cmd: &Command,
 ) where
@@ -59,7 +67,7 @@ async fn handle_get_clone_status<T>(
     let prop: CloneStatusProp = match serde_json::from_str(&cmd.props) {
         Ok(v) => v,
         Err(e) => {
-            send_err(&mut stream, format!("Invalid clone status prop : {e}")).await;
+            send_err(stream, format!("Invalid clone status prop : {e}")).await;
             return;
         }
     };
@@ -67,7 +75,7 @@ async fn handle_get_clone_status<T>(
     if state.current_session_id.is_some()
         && state.current_session_id.as_ref().unwrap() != &prop.session_id
     {
-        send_err(&mut stream, "Incorrect session id".to_string()).await;
+        send_err(stream, "Incorrect session id".to_string()).await;
         return;
     }
     if state.current_session_updates.is_some() {
@@ -95,11 +103,7 @@ async fn handle_get_clone_status<T>(
             Ok(v) => v,
             Err(e) => {
                 tracing::error!(msg = "Error serializing updates", error = e.to_string());
-                send_err(
-                    &mut stream,
-                    format!("Error serializing updates to string : {e}"),
-                )
-                .await;
+                send_err(stream, format!("Error serializing updates to string : {e}")).await;
                 return;
             }
         };
@@ -108,7 +112,7 @@ async fn handle_get_clone_status<T>(
     }
 }
 
-async fn handle_get_clones<T>(mut stream: &mut T, daemon_state: Arc<RwLock<DaemonState>>)
+async fn handle_get_clones<T>(stream: &mut T, daemon_state: &Arc<RwLock<DaemonState>>)
 where
     T: AsyncWrite + Send + Unpin,
 {
@@ -117,7 +121,7 @@ where
     let clones: Vec<CloneInfo> = match tokio::fs::read_dir(dir).await {
         Err(e) => {
             send_err(
-                &mut stream,
+                stream,
                 format!("Error reading clones directory entries : {e}"),
             )
             .await;
@@ -147,7 +151,7 @@ where
                 error = e.to_string()
             );
             send_err(
-                &mut stream,
+                stream,
                 format!("Error serializing clones information : {e}"),
             )
             .await;
@@ -158,7 +162,7 @@ where
     stream.write_all(&response).await.unwrap();
 }
 
-async fn handle_clone<T>(mut stream: T, daemon_state: Arc<RwLock<DaemonState>>, cmd: Command)
+async fn handle_clone<T>(stream: &mut T, daemon_state: &Arc<RwLock<DaemonState>>, cmd: Command)
 where
     T: AsyncRead + AsyncWrite + Send + Unpin,
 {
@@ -191,7 +195,7 @@ where
             clone_dir_name = clone_prop.dir_name
         );
         send_err(
-            &mut stream,
+            stream,
             format!(
                 "Error creating destination directory {} : {e}",
                 dest_dir.to_string_lossy()
@@ -230,7 +234,7 @@ where
     stream.write_all(&response).await.unwrap();
 }
 
-async fn handle_abort_clone<T>(mut stream: T, app_state: Arc<RwLock<DaemonState>>, cmd: Command)
+async fn handle_abort_clone<T>(mut stream: T, app_state: &Arc<RwLock<DaemonState>>, cmd: Command)
 where
     T: AsyncRead + AsyncWrite + Send + Unpin,
 {

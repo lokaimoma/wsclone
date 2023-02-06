@@ -20,6 +20,8 @@ pub struct Command {
     pub type_: CommandType,
     #[serde(default = "default_prop")]
     pub props: String,
+    #[serde(default, rename(deserialize = "keepAlive"))]
+    pub keep_alive: bool,
 }
 
 #[derive(Debug, Deserialize)]
