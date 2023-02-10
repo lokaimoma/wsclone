@@ -46,7 +46,7 @@ impl Payload for Command {
         let payload = match serde_json::to_string(self) {
             Ok(v) => v,
             Err(e) => {
-                return Err(error::Error::SerializationError(format!(
+                return Err(error::Error::Serialization(format!(
                     "Failed serialization of command payload to string : {e}"
                 )));
             }
@@ -102,7 +102,7 @@ impl Payload for CloneProp {
         let payload = match serde_json::to_string(self) {
             Ok(v) => v,
             Err(e) => {
-                return Err(error::Error::SerializationError(format!(
+                return Err(error::Error::Serialization(format!(
                     "Failed serialization of CloneProp payload to string : {e}"
                 )));
             }
@@ -139,7 +139,7 @@ impl Payload for AbortCloneProp {
         let payload = match serde_json::to_string(self) {
             Ok(v) => v,
             Err(e) => {
-                return Err(error::Error::SerializationError(format!(
+                return Err(error::Error::Serialization(format!(
                     "Failed serialization of AbortCloneProp payload to string : {e}"
                 )));
             }
@@ -176,7 +176,7 @@ impl Payload for CloneStatusProp {
         let payload = match serde_json::to_string(self) {
             Ok(v) => v,
             Err(e) => {
-                return Err(error::Error::SerializationError(format!(
+                return Err(error::Error::Serialization(format!(
                     "Failed serialization of CloneStatusProp payload to string : {e}"
                 )));
             }

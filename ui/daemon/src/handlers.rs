@@ -41,7 +41,9 @@ where
 
         match cmd.type_ {
             CommandType::HealthCheck => {
-                let payload = response::Ok("Alive".to_string());
+                let payload = response::Ok {
+                    msg: Some("Alive".to_string()),
+                };
                 let payload =
                     ipc_helpers::payload_to_bytes(&serde_json::to_string(&payload).unwrap())
                         .unwrap();
@@ -168,8 +170,9 @@ where
 {
     let mut app_state = daemon_state.write().await;
     if app_state.current_session_thread.is_some() {
-        let response =
-            response::Err("A clone task is already running in the background".to_string());
+        let response = response::Failure {
+            msg: "A clone task is already running in the background".to_string(),
+        };
         let response = serde_json::to_string(&response).unwrap();
         let response = ipc_helpers::payload_to_bytes(&response).unwrap();
         stream.write_all(&response).await.unwrap();
@@ -228,7 +231,9 @@ where
     });
     app_state.current_session_thread = Some(handle);
     drop(app_state);
-    let response = response::Ok("Clone started successfully".to_string());
+    let response = response::Ok {
+        msg: Some("Clone started successfully".to_string()),
+    };
     let response = serde_json::to_string(&response).unwrap();
     let response = ipc_helpers::payload_to_bytes(&response).unwrap();
     stream.write_all(&response).await.unwrap();
@@ -262,7 +267,9 @@ where
         app_state.current_session_id = None;
     }
     drop(app_state);
-    let response = response::Ok("Abort successful".to_string());
+    let response = response::Ok {
+        msg: Some("Abort successful".to_string()),
+    };
     let response = serde_json::to_string(&response).unwrap();
     let response = ipc_helpers::payload_to_bytes(&response).unwrap();
     stream.write_all(&response).await.unwrap();
@@ -272,7 +279,7 @@ async fn send_err<T>(mut stream: T, msg: String)
 where
     T: AsyncWrite + Send + Unpin,
 {
-    let err = response::Err(msg);
+    let err = response::Failure { msg };
     let bytes = ipc_helpers::payload_to_bytes(&serde_json::to_string(&err).unwrap()).unwrap();
     stream.write_all(&bytes).await.unwrap();
 }

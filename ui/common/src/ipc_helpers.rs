@@ -12,7 +12,7 @@ where
 {
     let mut payload_size_buffer = Vec::with_capacity(PAYLOAD_SIZE_INFO_LENGTH);
     if let Err(e) = stream.read_buf(&mut payload_size_buffer).await {
-        return Err(Error::ErrorReadingMessage(format!("{} : {}", e, e.kind())));
+        return Err(Error::MessageIO(format!("{} : {}", e, e.kind())));
     }
     let buf_size = match String::from_utf8(payload_size_buffer) {
         Ok(v) => match usize::from_str_radix(&v, 16) {
@@ -31,7 +31,7 @@ where
     };
     let mut payload_buf: Vec<u8> = Vec::with_capacity(buf_size);
     if let Err(e) = stream.read_buf(&mut payload_buf).await {
-        return Err(Error::ErrorReadingMessage(format!("{} : {}", e, e.kind())));
+        return Err(Error::MessageIO(format!("{} : {}", e, e.kind())));
     }
     match String::from_utf8(payload_buf) {
         Ok(s) => Ok(s),

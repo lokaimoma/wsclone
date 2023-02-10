@@ -1,19 +1,23 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
-pub struct Err(pub String);
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Failure {
+    pub msg: String,
+}
 
-#[derive(Serialize)]
-pub struct Ok(pub String);
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Ok{
+    pub msg: Option<String>
+}
 
-#[derive(Clone, Serialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct MessageContent {
     pub message: String,
     #[serde(rename = "isError")]
     pub is_error: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FileUpdate {
     #[serde(rename = "fileName")]
     pub file_name: String,
@@ -24,17 +28,17 @@ pub struct FileUpdate {
     pub message: Option<MessageContent>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CloneStatusResponse {
     pub updates: Vec<FileUpdate>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GetClonesResponse {
     pub clones: Vec<CloneInfo>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CloneInfo {
     pub title: String,
     //pub size: u64,
