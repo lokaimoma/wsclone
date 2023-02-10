@@ -41,7 +41,7 @@ where
 
         match cmd.type_ {
             CommandType::HealthCheck => {
-                let payload = response::Ok {
+                let payload = response::Success {
                     msg: Some("Alive".to_string()),
                 };
                 let payload =
@@ -231,7 +231,7 @@ where
     });
     app_state.current_session_thread = Some(handle);
     drop(app_state);
-    let response = response::Ok {
+    let response = response::Success {
         msg: Some("Clone started successfully".to_string()),
     };
     let response = serde_json::to_string(&response).unwrap();
@@ -267,7 +267,7 @@ where
         app_state.current_session_id = None;
     }
     drop(app_state);
-    let response = response::Ok {
+    let response = response::Success {
         msg: Some("Abort successful".to_string()),
     };
     let response = serde_json::to_string(&response).unwrap();
