@@ -6,9 +6,9 @@ use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio::sync::RwLock;
 use ws_common::command::{AbortCloneProp, CloneProp, CloneStatusProp, Command, CommandType};
-use ws_common::ipc_helpers;
 use ws_common::response;
 use ws_common::response::{CloneInfo, CloneStatusResponse, FileUpdate, GetClonesResponse};
+use ws_common::{ipc_helpers, Payload};
 
 #[tracing::instrument]
 pub async fn handle_connection<T>(mut stream: T, daemon_state: Arc<RwLock<DaemonState>>)
@@ -19,34 +19,23 @@ where
     while keep_alive {
         let cmd = match ipc_helpers::get_payload_content(&mut stream).await {
             Ok(r) => r,
-            Err(e) => {
-                send_err(&mut stream, e.to_string()).await;
-                return;
-            }
+            Err(e) => return send_err(&mut stream, e.to_string()).await,
         };
 
-        let cmd: Command = match serde_json::from_str(&cmd) {
-            Ok(r) => r,
-            Err(e) => {
-                send_err(
-                    &mut stream,
-                    format!("Error parsing payload to command type : {e}"),
-                )
-                .await;
-                return;
-            }
+        let cmd = match Command::from_str(&cmd) {
+            Ok(c) => c,
+            Err(e) => return send_err(stream, e.to_string()).await,
         };
 
         keep_alive = cmd.keep_alive;
 
         match cmd.type_ {
             CommandType::HealthCheck => {
-                let payload = response::Success {
-                    msg: Some("Alive".to_string()),
+                let msg = Some("Alive".to_string());
+                let payload = match (response::Success { msg }).to_bytes() {
+                    Ok(v) => v,
+                    Err(e) => return send_err(stream, e.to_string()).await,
                 };
-                let payload =
-                    ipc_helpers::payload_to_bytes(&serde_json::to_string(&payload).unwrap())
-                        .unwrap();
                 stream.write_all(&payload).await.unwrap();
             }
             CommandType::Clone => handle_clone(&mut stream, &daemon_state, cmd).await,
@@ -66,19 +55,15 @@ async fn handle_get_clone_status<T>(
 ) where
     T: AsyncWrite + Send + Unpin,
 {
-    let prop: CloneStatusProp = match serde_json::from_str(&cmd.props) {
+    let prop = match CloneStatusProp::from_str(&cmd.props) {
         Ok(v) => v,
-        Err(e) => {
-            send_err(stream, format!("Invalid clone status prop : {e}")).await;
-            return;
-        }
+        Err(e) => return send_err(stream, e.to_string()).await,
     };
     let mut state = daemon_state.write().await;
     if state.current_session_id.is_some()
         && state.current_session_id.as_ref().unwrap() != &prop.session_id
     {
-        send_err(stream, "Incorrect session id".to_string()).await;
-        return;
+        return send_err(stream, "Incorrect session id".to_string()).await;
     }
     if state.current_session_updates.is_some() {
         let updates = state.current_session_updates.clone();
@@ -100,16 +85,10 @@ async fn handle_get_clone_status<T>(
                 message: status.message,
             })
             .collect();
-        let response = CloneStatusResponse { updates };
-        let response = match serde_json::to_string(&response) {
-            Ok(v) => v,
-            Err(e) => {
-                tracing::error!(msg = "Error serializing updates", error = e.to_string());
-                send_err(stream, format!("Error serializing updates to string : {e}")).await;
-                return;
-            }
+        let response = match (CloneStatusResponse { updates }).to_bytes() {
+            Ok(b) => b,
+            Err(e) => return send_err(stream, e.to_string()).await,
         };
-        let response = ipc_helpers::payload_to_bytes(&response).unwrap();
         stream.write_all(&response).await.unwrap();
     }
 }
@@ -121,14 +100,7 @@ where
     let dir = daemon_state.read().await.clones_dir.clone();
     // later the results will be cached into the app state
     let clones: Vec<CloneInfo> = match tokio::fs::read_dir(dir).await {
-        Err(e) => {
-            send_err(
-                stream,
-                format!("Error reading clones directory entries : {e}"),
-            )
-            .await;
-            return;
-        }
+        Err(e) => return send_err(stream, e.to_string()).await,
         Ok(mut read_dir) => {
             // other info will be taken later. Taking only dir name for now
             let mut res: Vec<String> = Vec::new();
@@ -144,23 +116,10 @@ where
                 .collect()
         }
     };
-    let response = GetClonesResponse { clones };
-    let response = match serde_json::to_string(&response) {
+    let response = match (GetClonesResponse { clones }).to_bytes() {
         Ok(v) => v,
-        Err(e) => {
-            tracing::error!(
-                msg = "Error serializing clones information",
-                error = e.to_string()
-            );
-            send_err(
-                stream,
-                format!("Error serializing clones information : {e}"),
-            )
-            .await;
-            return;
-        }
+        Err(e) => return send_err(stream, e.to_string()).await,
     };
-    let response = ipc_helpers::payload_to_bytes(&response).unwrap();
     stream.write_all(&response).await.unwrap();
 }
 
@@ -178,12 +137,9 @@ where
         stream.write_all(&response).await.unwrap();
         return;
     }
-    let clone_prop: CloneProp = match serde_json::from_str(&cmd.props) {
+    let clone_prop = match CloneProp::from_str(&cmd.props) {
         Ok(v) => v,
-        Err(e) => {
-            send_err(stream, format!("Invalid clone prop payload : {e}")).await;
-            return;
-        }
+        Err(e) => return send_err(stream, e.to_string()).await,
     };
     app_state.current_session_id = Some(clone_prop.session_id.clone());
     app_state.current_session_updates = Some(HashMap::new());
@@ -197,7 +153,7 @@ where
             error_kind = e.kind().to_string(),
             clone_dir_name = clone_prop.dir_name
         );
-        send_err(
+        return send_err(
             stream,
             format!(
                 "Error creating destination directory {} : {e}",
@@ -205,7 +161,6 @@ where
             ),
         )
         .await;
-        return;
     }
     let dest_dir = dest_dir.to_string_lossy().to_string();
     let daemon_state = daemon_state.clone();
@@ -231,11 +186,14 @@ where
     });
     app_state.current_session_thread = Some(handle);
     drop(app_state);
-    let response = response::Success {
+    let response = match (response::Success {
         msg: Some("Clone started successfully".to_string()),
+    })
+    .to_bytes()
+    {
+        Ok(v) => v,
+        Err(e) => return send_err(stream, e.to_string()).await,
     };
-    let response = serde_json::to_string(&response).unwrap();
-    let response = ipc_helpers::payload_to_bytes(&response).unwrap();
     stream.write_all(&response).await.unwrap();
 }
 
@@ -243,16 +201,9 @@ async fn handle_abort_clone<T>(mut stream: T, app_state: &Arc<RwLock<DaemonState
 where
     T: AsyncRead + AsyncWrite + Send + Unpin,
 {
-    let abort_clone_prop: AbortCloneProp = match serde_json::from_str(&cmd.props) {
+    let abort_clone_prop = match AbortCloneProp::from_str(&cmd.props) {
         Ok(v) => v,
-        Err(e) => {
-            send_err(
-                stream,
-                format!("Error parsing props as an AbortCloneProp : {e}"),
-            )
-            .await;
-            return;
-        }
+        Err(e) => return send_err(stream, e.to_string()).await,
     };
 
     let mut app_state = app_state.write().await;
@@ -267,11 +218,14 @@ where
         app_state.current_session_id = None;
     }
     drop(app_state);
-    let response = response::Success {
+    let response = match (response::Success {
         msg: Some("Abort successful".to_string()),
+    })
+    .to_bytes()
+    {
+        Ok(v) => v,
+        Err(e) => return send_err(stream, e.to_string()).await,
     };
-    let response = serde_json::to_string(&response).unwrap();
-    let response = ipc_helpers::payload_to_bytes(&response).unwrap();
     stream.write_all(&response).await.unwrap();
 }
 
@@ -279,7 +233,6 @@ async fn send_err<T>(mut stream: T, msg: String)
 where
     T: AsyncWrite + Send + Unpin,
 {
-    let err = response::Failure { msg };
-    let bytes = ipc_helpers::payload_to_bytes(&serde_json::to_string(&err).unwrap()).unwrap();
-    stream.write_all(&bytes).await.unwrap();
+    let err = response::Failure { msg }.to_bytes().unwrap();
+    stream.write_all(&err).await.unwrap();
 }
