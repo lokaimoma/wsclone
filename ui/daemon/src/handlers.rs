@@ -80,16 +80,18 @@ async fn handle_get_clone_status<T>(
             )
         }
         drop(state);
-        let updates = updates.unwrap();
-        let updates = updates
-            .into_iter()
-            .map(|(file_name, status)| FileUpdate {
-                file_name,
-                bytes_written: status.bytes_written,
-                file_size: status.f_size,
-                message: status.message,
-            })
-            .collect();
+        let updates = match updates {
+            Some(updates) => updates
+                .into_iter()
+                .map(|(file_name, status)| FileUpdate {
+                    file_name,
+                    bytes_written: status.bytes_written,
+                    file_size: status.f_size,
+                    message: status.message,
+                })
+                .collect(),
+            None => Vec::new(),
+        };
         let response = match (CloneStatusResponse { updates }).to_bytes() {
             Ok(b) => b,
             Err(e) => return send_err(stream, e.to_string()).await,
