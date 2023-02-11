@@ -60,6 +60,7 @@ async fn main() {
         current_session_thread: None,
         current_session_updates: None,
         clones_dir: daemon_cli.clones_dir.clone(),
+        completed_session: Default::default(),
     }));
 
     let state_clone = state.clone();
