@@ -69,10 +69,15 @@ async fn handle_get_clone_status<T>(
         let updates = state.current_session_updates.clone();
         if state.current_session_thread.is_some() {
             state.current_session_updates = Some(HashMap::new());
+            tracing::info!(msg = "Fetching updates. Cloning not completed yet.")
         } else {
             state.current_session_thread = None;
             state.current_session_id = None;
             state.current_session_updates = None;
+            tracing::info!(
+                msg = "Cloning completed. Resetting state to default.",
+                state = state.to_string()
+            )
         }
         drop(state);
         let updates = updates.unwrap();
@@ -165,7 +170,7 @@ where
     let dest_dir = dest_dir.to_string_lossy().to_string();
     let daemon_state = daemon_state.clone();
     let handle = tokio::spawn(async move {
-        libwsclone::init_download(
+        let res = libwsclone::init_download(
             &clone_prop.session_id,
             &clone_prop.link,
             &dest_dir,
@@ -180,9 +185,12 @@ where
             },
             tx,
         )
-        .await
-        .unwrap();
+        .await;
         daemon_state.write().await.current_session_thread = None;
+        tracing::info!(
+            msg = "Download session terminated",
+            error_occured = res.is_err()
+        );
     });
     app_state.current_session_thread = Some(handle);
     drop(app_state);
