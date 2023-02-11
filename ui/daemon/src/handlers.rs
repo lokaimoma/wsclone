@@ -61,44 +61,58 @@ async fn handle_get_clone_status<T>(
     };
     let mut state = daemon_state.write().await;
     if state.current_session_id.is_some()
-        && state.current_session_id.as_ref().unwrap() != &prop.session_id
+        && state.current_session_id.as_ref().unwrap() == &prop.session_id
     {
-        return send_err(stream, "Incorrect session id".to_string()).await;
-    }
-    if state.current_session_updates.is_some() {
-        let updates = state.current_session_updates.clone();
-        if state.current_session_thread.is_some() {
-            state.current_session_updates = Some(HashMap::new());
-            tracing::debug!(msg = "Fetching updates. Cloning not completed yet.")
-        } else {
-            state.current_session_thread = None;
-            state.current_session_id = None;
-            state.current_session_updates = None;
-            tracing::debug!(
-                msg = "Cloning completed. Resetting state to default.",
-                state = state.to_string()
-            )
+        if state.current_session_updates.is_some() {
+            let updates = state.current_session_updates.clone();
+            if state.current_session_thread.is_some() {
+                state.current_session_updates = Some(HashMap::new());
+                tracing::debug!(msg = "Fetching updates. Cloning not completed yet.")
+            } else {
+                state.current_session_thread = None;
+                state.current_session_id = None;
+                state.current_session_updates = None;
+                tracing::debug!(
+                    msg = "Cloning completed. Resetting state to default.",
+                    state = state.to_string()
+                )
+            }
+            let completed = state.completed_session.contains(&prop.session_id);
+            drop(state);
+            let updates = match updates {
+                Some(updates) => updates
+                    .into_iter()
+                    .map(|(file_name, status)| FileUpdate {
+                        file_name,
+                        bytes_written: status.bytes_written,
+                        file_size: status.f_size,
+                        message: status.message,
+                    })
+                    .collect(),
+                None => Vec::new(),
+            };
+            let response = match (CloneStatusResponse { updates, completed }).to_bytes() {
+                Ok(b) => b,
+                Err(e) => return send_err(stream, e.to_string()).await,
+            };
+            stream.write_all(&response).await.unwrap();
         }
-        let completed = state.completed_session.contains(&prop.session_id);
-        drop(state);
-        let updates = match updates {
-            Some(updates) => updates
-                .into_iter()
-                .map(|(file_name, status)| FileUpdate {
-                    file_name,
-                    bytes_written: status.bytes_written,
-                    file_size: status.f_size,
-                    message: status.message,
-                })
-                .collect(),
-            None => Vec::new(),
-        };
-        let response = match (CloneStatusResponse { updates, completed }).to_bytes() {
+        return;
+    }
+    if state.completed_session.contains(&prop.session_id) {
+        let response = match (CloneStatusResponse {
+            completed: true,
+            updates: Default::default(),
+        })
+        .to_bytes()
+        {
             Ok(b) => b,
             Err(e) => return send_err(stream, e.to_string()).await,
         };
         stream.write_all(&response).await.unwrap();
+        return;
     }
+    send_err(stream, "Incorrect session id".to_string()).await;
 }
 
 async fn handle_get_clones<T>(stream: &mut T, daemon_state: &Arc<RwLock<DaemonState>>)
