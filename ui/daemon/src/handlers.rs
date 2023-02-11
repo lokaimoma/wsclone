@@ -69,12 +69,12 @@ async fn handle_get_clone_status<T>(
         let updates = state.current_session_updates.clone();
         if state.current_session_thread.is_some() {
             state.current_session_updates = Some(HashMap::new());
-            tracing::info!(msg = "Fetching updates. Cloning not completed yet.")
+            tracing::debug!(msg = "Fetching updates. Cloning not completed yet.")
         } else {
             state.current_session_thread = None;
             state.current_session_id = None;
             state.current_session_updates = None;
-            tracing::info!(
+            tracing::debug!(
                 msg = "Cloning completed. Resetting state to default.",
                 state = state.to_string()
             )
@@ -187,7 +187,7 @@ where
         )
         .await;
         daemon_state.write().await.current_session_thread = None;
-        tracing::info!(
+        tracing::debug!(
             msg = "Download session terminated",
             error_occured = res.is_err()
         );
