@@ -79,6 +79,7 @@ async fn handle_get_clone_status<T>(
                 state = state.to_string()
             )
         }
+        let completed = state.completed_session.contains(&prop.session_id);
         drop(state);
         let updates = match updates {
             Some(updates) => updates
@@ -92,7 +93,7 @@ async fn handle_get_clone_status<T>(
                 .collect(),
             None => Vec::new(),
         };
-        let response = match (CloneStatusResponse { updates }).to_bytes() {
+        let response = match (CloneStatusResponse { updates, completed }).to_bytes() {
             Ok(b) => b,
             Err(e) => return send_err(stream, e.to_string()).await,
         };
@@ -172,8 +173,9 @@ where
     let dest_dir = dest_dir.to_string_lossy().to_string();
     let daemon_state = daemon_state.clone();
     let handle = tokio::spawn(async move {
+        let sess_id = clone_prop.session_id.clone();
         let res = libwsclone::init_download(
-            &clone_prop.session_id,
+            &sess_id,
             &clone_prop.link,
             &dest_dir,
             DownloadRule {
@@ -188,7 +190,9 @@ where
             tx,
         )
         .await;
-        daemon_state.write().await.current_session_thread = None;
+        let mut state = daemon_state.write().await;
+        state.current_session_thread = None;
+        state.completed_session.insert(sess_id);
         tracing::debug!(
             msg = "Download session terminated",
             error_occured = res.is_err()

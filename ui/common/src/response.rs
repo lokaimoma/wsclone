@@ -124,6 +124,7 @@ impl Payload for FileUpdate {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CloneStatusResponse {
+    pub completed: bool,
     pub updates: Vec<FileUpdate>,
 }
 

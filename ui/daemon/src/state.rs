@@ -1,5 +1,5 @@
 use libwsclone::Update;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Formatter;
 use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
@@ -16,6 +16,8 @@ pub struct DaemonState {
     /// An optional map of file names to their current download status
     pub current_session_updates: Option<HashMap<String, FileStatus>>,
     pub clones_dir: PathBuf,
+    /// Session ids of clone sessions completed after the daemon was start.
+    pub completed_session: HashSet<String>
 }
 
 impl std::fmt::Display for DaemonState {
