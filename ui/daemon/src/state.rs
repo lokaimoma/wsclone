@@ -17,7 +17,7 @@ pub struct DaemonState {
     pub current_session_updates: Option<HashMap<String, FileStatus>>,
     pub clones_dir: PathBuf,
     /// Session ids of clone sessions completed after the daemon was start.
-    pub completed_session: HashSet<String>
+    pub completed_session: HashSet<String>,
 }
 
 impl std::fmt::Display for DaemonState {

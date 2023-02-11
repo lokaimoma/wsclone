@@ -112,7 +112,7 @@ async fn handle_get_clone_status<T>(
         stream.write_all(&response).await.unwrap();
         return;
     }
-    send_err(stream, "Incorrect session id".to_string()).await;
+    send_err(stream, "Unknown session id".to_string()).await;
 }
 
 async fn handle_get_clones<T>(stream: &mut T, daemon_state: &Arc<RwLock<DaemonState>>)
