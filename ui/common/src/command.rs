@@ -1,5 +1,3 @@
-use crate::ipc_helpers;
-use crate::{error, Payload};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -24,37 +22,6 @@ pub struct Command {
     pub props: String,
     #[serde(default, rename(deserialize = "keepAlive"))]
     pub keep_alive: bool,
-}
-
-impl Payload for Command {
-    fn from_str<'a>(payload: &'a str) -> error::Result<Self>
-    where
-        Self: Deserialize<'a>,
-    {
-        match serde_json::from_str(payload) {
-            Ok(v) => Ok(v),
-            Err(e) => Err(error::Error::InvalidPayload(format!(
-                "Error parsing payload to command type : {e}"
-            ))),
-        }
-    }
-
-    fn to_bytes(&self) -> error::Result<Vec<u8>>
-    where
-        Self: Serialize,
-    {
-        let payload = match serde_json::to_string(self) {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(error::Error::Serialization(format!(
-                    "Failed serialization of command payload to string : {e}"
-                )));
-            }
-        };
-
-        let payload = ipc_helpers::payload_to_bytes(&payload).unwrap();
-        Ok(payload)
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -82,107 +49,14 @@ pub struct CloneProp {
     pub abort_on_download_error: bool,
 }
 
-impl Payload for CloneProp {
-    fn from_str<'a>(payload: &'a str) -> error::Result<Self>
-    where
-        Self: Deserialize<'a>,
-    {
-        match serde_json::from_str(payload) {
-            Ok(v) => Ok(v),
-            Err(e) => Err(error::Error::InvalidPayload(format!(
-                "Error parsing payload to CloneProp type : {e}"
-            ))),
-        }
-    }
-
-    fn to_bytes(&self) -> error::Result<Vec<u8>>
-    where
-        Self: Serialize,
-    {
-        let payload = match serde_json::to_string(self) {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(error::Error::Serialization(format!(
-                    "Failed serialization of CloneProp payload to string : {e}"
-                )));
-            }
-        };
-
-        let payload = ipc_helpers::payload_to_bytes(&payload).unwrap();
-        Ok(payload)
-    }
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AbortCloneProp {
     #[serde(rename(deserialize = "sessionId"))]
     pub session_id: String,
 }
 
-impl Payload for AbortCloneProp {
-    fn from_str<'a>(payload: &'a str) -> error::Result<Self>
-    where
-        Self: Deserialize<'a>,
-    {
-        match serde_json::from_str(payload) {
-            Ok(v) => Ok(v),
-            Err(e) => Err(error::Error::InvalidPayload(format!(
-                "Error parsing payload to AbortCloneProp type : {e}"
-            ))),
-        }
-    }
-
-    fn to_bytes(&self) -> error::Result<Vec<u8>>
-    where
-        Self: Serialize,
-    {
-        let payload = match serde_json::to_string(self) {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(error::Error::Serialization(format!(
-                    "Failed serialization of AbortCloneProp payload to string : {e}"
-                )));
-            }
-        };
-
-        let payload = ipc_helpers::payload_to_bytes(&payload).unwrap();
-        Ok(payload)
-    }
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CloneStatusProp {
     #[serde(rename(deserialize = "sessionId"))]
     pub session_id: String,
-}
-
-impl Payload for CloneStatusProp {
-    fn from_str<'a>(payload: &'a str) -> error::Result<Self>
-    where
-        Self: Deserialize<'a>,
-    {
-        match serde_json::from_str(payload) {
-            Ok(v) => Ok(v),
-            Err(e) => Err(error::Error::InvalidPayload(format!(
-                "Error parsing payload to CloneStatusProp type : {e}"
-            ))),
-        }
-    }
-
-    fn to_bytes(&self) -> error::Result<Vec<u8>>
-    where
-        Self: Serialize,
-    {
-        let payload = match serde_json::to_string(self) {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(error::Error::Serialization(format!(
-                    "Failed serialization of CloneStatusProp payload to string : {e}"
-                )));
-            }
-        };
-
-        let payload = ipc_helpers::payload_to_bytes(&payload).unwrap();
-        Ok(payload)
-    }
 }
