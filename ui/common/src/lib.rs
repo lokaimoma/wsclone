@@ -35,7 +35,8 @@ macro_rules! payload {
                 match serde_json::from_str(payload) {
                     Ok(v) => Ok(v),
                     Err(e) => Err(error::Error::InvalidPayload(format!(
-                        "Error parsing payload : {e}",
+                        "Error parsing payload to {} type: {e}",
+                        std::any::type_name::<$ty>()
                     ))),
                 }
             }
@@ -48,7 +49,8 @@ macro_rules! payload {
                     Ok(v) => v,
                     Err(e) => {
                         return Err(error::Error::Serialization(format!(
-                            "Failed serialization of payload to string : {e}",
+                            "Failed serialization of {} to json string: {e}",
+                            std::any::type_name::<$ty>()
                         )));
                     }
                 };
