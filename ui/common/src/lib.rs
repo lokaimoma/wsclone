@@ -15,6 +15,7 @@ pub trait Payload {
     where
         Self: Serialize;
 }
+
 payload!(Command);
 payload!(CloneProp);
 payload!(AbortCloneProp);

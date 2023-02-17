@@ -49,9 +49,9 @@ pub async fn download_file(
     let mut response = match client.get(dld_item.link.to_string()).send().await {
         Err(e) => {
             tracing::error!(
-                "Error downloading file from {}\nError : {}",
-                dld_item.link.to_string(),
-                e
+                msg = "Error downloading file from server.",
+                url = dld_item.link.to_string(),
+                error_msg = e.to_string(),
             );
             // File name is always passed for first page.
             // If it's the first page, then we want to
@@ -65,9 +65,9 @@ pub async fn download_file(
         Ok(r) => {
             if !r.status().is_success() {
                 tracing::error!(
-                    "Error status code received : {} |{}|",
-                    r.status(),
-                    dld_item.link
+                    msg = "Invalid status code received",
+                    status_code = r.status().to_string(),
+                    url = dld_item.link.to_string()
                 );
                 return if rule.abort_on_download_error {
                     Err(WscError::ErrorStatusCode {
@@ -118,10 +118,10 @@ pub async fn download_file(
     {
         Err(e) => {
             tracing::error!(
-                "Error opening/creating file {}\nError : {} | {}",
-                dld_item.destination_dir.to_str().unwrap(),
-                e,
-                e.kind()
+                msg = "Error opening/creating file",
+                destination_dir = dld_item.destination_dir.to_str().unwrap(),
+                error_msg = e.to_string(),
+                error_kind = e.kind().to_string()
             );
             if (update_tx
                 .send(MessageUpdate(Message {
@@ -156,10 +156,10 @@ pub async fn download_file(
         Ok(m) => m.len(),
         Err(e) => {
             tracing::debug!(
-                "Error getting file size for {} @ {}\nError : {}",
-                dld_item.destination_dir.to_string_lossy().to_string(),
-                dld_item.link.to_string(),
-                e
+                msg = "Failed to get file size on disk",
+                destination_dir = dld_item.destination_dir.to_string_lossy().to_string(),
+                url = dld_item.link.to_string(),
+                error_msg = e.to_string(),
             );
             0
         }
@@ -192,9 +192,9 @@ pub async fn download_file(
     while let Some(chunks) = match response.chunk().await {
         Err(e) => {
             tracing::error!(
-                "Error downloading resource from {}\nError : {}",
-                dld_item.link.to_string(),
-                e
+                msg = "Error downloading file from server",
+                url = dld_item.link.to_string(),
+                error_msg = e.to_string()
             );
             if e.is_connect() {
                 if (update_tx
