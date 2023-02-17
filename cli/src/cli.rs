@@ -75,7 +75,7 @@ pub async fn download(cli: Cli) {
                     "Download wasn't able to complete"
                         .if_supports_color(Stream::Stdout, |text| text.bright_red())
                 );
-                println!("{}", e);
+                println!("{e}") 
             }
         }
     });
