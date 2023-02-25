@@ -13,7 +13,7 @@
     <ul class="links-container">
         <li><a href="#"><Dashboard /></a></li>
         <li><a href="#"><Clones /></a></li>
-        <li><a href="#"><Add /></a></li>
+        <li><a href="#"><Add fill="red"/></a></li>
         <li><a href="#"><Settings /></li>
     </ul>
 </nav>
