@@ -31,7 +31,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background-color: #afafaf;
+        background-color: #545050;
         width: max-content;
         padding: 1rem;
     }
