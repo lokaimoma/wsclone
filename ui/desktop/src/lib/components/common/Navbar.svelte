@@ -11,10 +11,10 @@
         <Logo />
     </div>
     <ul class="links-container">
-        <li><a href="#"><Dashboard /></a></li>
-        <li><a href="#"><Clones /></a></li>
-        <li><a href="#"><Add fill="red"/></a></li>
-        <li><a href="#"><Settings /></li>
+        <li><a href="#"><Dashboard fill="#333"/></a></li>
+        <li><a href="#"><Clones fill="#333"/></a></li>
+        <li><a href="#"><Add fill="#333"/></a></li>
+        <li><a href="#"><Settings fill="#333"/></li>
     </ul>
 </nav>
 
