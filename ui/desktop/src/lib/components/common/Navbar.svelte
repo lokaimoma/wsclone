@@ -4,6 +4,8 @@
     import Clones from "./svg/Clone.svelte";
     import Settings from "./svg/Settings.svelte";
     import Logo from "./svg/Logo.svelte";
+
+    
 </script>
 
 <nav class="nav">
