@@ -4,8 +4,7 @@
     margin: 0;
 }
 
-:global(.page) {
-    padding: 1rem;
-    background-color: green;
+hr {
+    border: 1px solid #ccc;
 }
 

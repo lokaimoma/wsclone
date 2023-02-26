@@ -16,5 +16,6 @@
 
     :global(.page) {
         padding: 1rem;
+        background-color: #F0F0F0;
     }
 </style>
