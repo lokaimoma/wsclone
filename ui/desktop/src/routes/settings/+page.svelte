@@ -6,7 +6,7 @@
     });
 </script>
 
-<div>
+<div class="page">
     <h1>Settings</h1>
     <p>
         Lorem ipsum dolor sit amet, officia excepteur ex fugiat reprehenderit

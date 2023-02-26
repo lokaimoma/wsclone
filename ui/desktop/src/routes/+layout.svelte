@@ -13,4 +13,8 @@
         display: grid;
         grid-template-columns: auto 1fr;
     }
+
+    :global(.page) {
+        padding: 1rem;
+    }
 </style>
