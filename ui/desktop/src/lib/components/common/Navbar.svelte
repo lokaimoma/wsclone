@@ -4,8 +4,7 @@
     import Clones from "./svg/Clone.svelte";
     import Settings from "./svg/Settings.svelte";
     import Logo from "./svg/Logo.svelte";
-
-    
+    import { Tab, currentTab } from "$lib/stores/Navbar";
 </script>
 
 <nav class="nav">
@@ -13,10 +12,30 @@
         <Logo />
     </div>
     <ul class="links-container">
-        <li><a href="#"><Dashboard fill="#333"/></a></li>
-        <li><a href="#"><Clones fill="#333"/></a></li>
-        <li><a href="#"><Add fill="#333"/></a></li>
-        <li><a href="#"><Settings fill="#333"/></li>
+        <li class={$currentTab === Tab.DASHBOARD ? "current" : ""}>
+            <a href="/"
+                ><Dashboard
+                    fill={$currentTab === Tab.DASHBOARD ? "#ccc" : "#333"}
+                />
+            </a>
+        </li>
+        <li class={$currentTab === Tab.CLONES ? "current" : ""}>
+            <a href="/clones"
+                ><Clones fill={$currentTab === Tab.CLONES ? "#ccc" : "#333"} />
+            </a>
+        </li>
+        <li class={$currentTab === Tab.ADD ? "current" : ""}>
+            <a href="/add"
+                ><Add fill={$currentTab === Tab.ADD ? "#ccc" : "#333"} />
+            </a>
+        </li>
+        <li class={$currentTab === Tab.SETTINGS ? "current" : ""}>
+            <a href="/settings"
+                ><Settings
+                    fill={$currentTab === Tab.SETTINGS ? "#ccc" : "#333"}
+                />
+            </a>
+        </li>
     </ul>
 </nav>
 
@@ -35,13 +54,19 @@
         justify-content: center;
         background-color: #545050;
         width: max-content;
-        padding: 1rem;
     }
     .links-container {
         width: max-content;
         list-style: none;
         display: flex;
         flex-direction: column;
+    }
+    .img-container,
+    li {
         padding: 1rem;
+    }
+
+    li.current {
+        background-color: #333;
     }
 </style>
