@@ -1,23 +1,32 @@
+<script lang="ts">
+    let description: string;
+    let title: string;
+    let url: URL;
+    let maxLevel: number;
+    let maxFileSize: number;
+    let blackListUrls: string;
+</script>
+
 <div class="sec-container">
     <h3>Configure your clone</h3>
-    <br>
+    <br />
     <hr />
     <div class="form">
         <label>
             <span>Title</span>
-            <input type="text" />
+            <input type="text" bind:value={title} />
         </label>
         <label>
             <span>Description</span>
-            <textarea rows="3" />
+            <textarea rows="3" bind:value={description} />
         </label>
         <label>
             <span>URL</span>
-            <input type="url" />
+            <input type="url" value={url?.toString() ?? ""} />
         </label>
         <label>
             <span>Max level</span>
-            <select>
+            <select bind:value={maxLevel}>
                 <option value="0">0</option>
                 <option value="1">1</option>
                 <option value="2">2</option>
@@ -32,7 +41,7 @@
         </label>
         <label
             ><span>Max file size</span>
-            <select>
+            <select bind:value={maxFileSize}>
                 <option value="10 mb">10 mb</option>
                 <option value="20 mb">20 mb</option>
                 <option value="30 mb">30 mb</option>
@@ -40,7 +49,7 @@
         </label>
         <label>
             <span>Blacklist url/patterns</span>
-            <textarea rows="3" />
+            <textarea rows="3" bind:value={blackListUrls} />
         </label>
     </div>
     <button disabled>Proceed</button>
@@ -80,7 +89,9 @@
         transition: border-color 250ms ease-in-out;
     }
 
-    input:focus,textarea:focus,select:focus {
+    input:focus,
+    textarea:focus,
+    select:focus {
         border-color: #333;
     }
 
