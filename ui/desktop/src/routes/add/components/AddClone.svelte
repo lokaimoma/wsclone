@@ -5,16 +5,28 @@
     let maxLevel: number;
     let maxFileSize: number;
     let blackListUrls: string;
+    let urlError: boolean = false;
+
+    //validate url and set
+    function onUrlChange(event: Event) {
+        const target = event.target as HTMLInputElement;
+        urlError = false;
+        try {
+            url = new URL(target.value);
+        } catch (e) {
+            urlError = true;
+        }
+    }
 </script>
 
 <div class="sec-container">
     <h3>Configure your clone</h3>
     <br />
     <hr />
-    <div class="form">
+    <form class="form">
         <label>
             <span>Title</span>
-            <input type="text" bind:value={title} />
+            <input type="text" bind:value={title} required />
         </label>
         <label>
             <span>Description</span>
@@ -22,7 +34,17 @@
         </label>
         <label>
             <span>URL</span>
-            <input type="url" value={url?.toString() ?? ""} />
+            <div>
+                <input
+                    type="url"
+                    on:change={(e) => onUrlChange(e)}
+                    required
+                    placeholder="https://somedomain.com/"
+                />
+                {#if urlError}
+                    <p class="error">Invalid url</p>
+                {/if}
+            </div>
         </label>
         <label>
             <span>Max level</span>
@@ -51,11 +73,17 @@
             <span>Blacklist url/patterns</span>
             <textarea rows="3" bind:value={blackListUrls} />
         </label>
-    </div>
-    <button disabled>Proceed</button>
+    </form>
+    <button disabled={url === undefined || (title?.length ?? 0) == 0}>Proceed</button>
 </div>
 
 <style>
+    :root {
+        --text-sm: 0.7em;
+        --clr-disabled: #858585;
+        --clr-secondary: #333;
+    }
+
     .sec-container {
         position: relative;
     }
@@ -101,7 +129,7 @@
 
     button {
         color: #fff;
-        background-color: #333;
+        background-color: var(--clr-secondary);
         padding: 0.3rem 1rem;
         border: none;
         font-weight: bold;
@@ -121,7 +149,12 @@
     }
 
     button:disabled {
-        background-color: #858585;
+        background-color: var(--clr-disabled);
         color: rgba(255, 255, 255, 0.7);
+    }
+    .error {
+        color: red;
+        font-weight: bold;
+        font-size: var(--text-sm);
     }
 </style>
