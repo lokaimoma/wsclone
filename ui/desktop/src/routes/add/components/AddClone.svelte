@@ -5,7 +5,8 @@
     let maxLevel: number;
     let maxFileSize: number;
     let blackListUrls: string;
-    let urlError: boolean = false;
+    let urlError = false;
+    let processingReq = false;
 
     //validate url and set
     function onUrlChange(event: Event) {
@@ -16,6 +17,10 @@
         } catch (e) {
             urlError = true;
         }
+    }
+
+    function onProceedBtnClicked() {
+        processingReq = true;
     }
 </script>
 
@@ -74,7 +79,22 @@
             <textarea rows="3" bind:value={blackListUrls} />
         </label>
     </form>
-    <button disabled={url === undefined || (title?.length ?? 0) == 0}>Proceed</button>
+    {#if !processingReq}
+        <button
+            on:click={onProceedBtnClicked}
+            disabled={url === undefined || (title?.length ?? 0) == 0}
+            >Proceed</button
+        >
+    {:else}
+        <button disabled>
+            <div>
+                Please wait<span class="inc-disp"
+                    ><div class="hider" />
+                    ...</span
+                >
+            </div>
+        </button>
+    {/if}
 </div>
 
 <style>
@@ -151,10 +171,34 @@
     button:disabled {
         background-color: var(--clr-disabled);
         color: rgba(255, 255, 255, 0.7);
+        cursor: initial;
     }
     .error {
         color: red;
         font-weight: bold;
         font-size: var(--text-sm);
+    }
+
+    .inc-disp {
+        position: relative;
+        display: inline-block;
+    }
+
+    .hider {
+        background: var(--clr-disabled);
+        z-index: 2;
+        position: absolute;
+        inset: 0;
+        animation: move-right 3s ease-in-out alternate infinite both;
+    }
+
+    @keyframes move-right {
+        0% {
+            left: 0px;
+        }
+
+        100% {
+            left: 11px;
+        }
     }
 </style>
