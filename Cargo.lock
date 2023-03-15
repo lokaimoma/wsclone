@@ -4076,6 +4076,7 @@ dependencies = [
 name = "wsclone_ui"
 version = "0.0.0"
 dependencies = [
+ "common",
  "serde",
  "serde_json",
  "tauri",

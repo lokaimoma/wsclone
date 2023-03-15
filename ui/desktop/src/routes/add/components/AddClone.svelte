@@ -8,7 +8,6 @@
     let urlError = false;
     let processingReq = false;
 
-    //validate url and set
     function onUrlChange(event: Event) {
         const target = event.target as HTMLInputElement;
         urlError = false;
@@ -21,6 +20,7 @@
 
     function onProceedBtnClicked() {
         processingReq = true;
+        // build AddClone payload and invoke tauri command
     }
 </script>
 
@@ -31,11 +31,11 @@
     <form class="form">
         <label>
             <span>Title</span>
-            <input type="text" bind:value={title} required />
+            <input disabled={processingReq} type="text" bind:value={title} required />
         </label>
         <label>
             <span>Description</span>
-            <textarea rows="3" bind:value={description} />
+            <textarea disabled={processingReq} rows="3" bind:value={description} />
         </label>
         <label>
             <span>URL</span>
@@ -76,7 +76,7 @@
         </label>
         <label>
             <span>Blacklist url/patterns</span>
-            <textarea rows="3" bind:value={blackListUrls} />
+            <textarea placeholder="/css,https://google.com,/ok" rows="3" bind:value={blackListUrls} />
         </label>
     </form>
     {#if !processingReq}
