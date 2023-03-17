@@ -4,3 +4,4 @@
 /.idea/
 *.sock
 /logs/
+ui/desktop/binaries/

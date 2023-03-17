@@ -91,9 +91,9 @@ impl DaemonCli {
             Ok(l) => l,
             Err(e) => {
                 tracing::error!(
-                    "Error creating TCP socket",
-                    error = e
-                    error_kind = e.kind()
+                    msg = "Error creating TCP socket",
+                    error = e.to_string(),
+                    error_kind = e.kind().to_string()
                 );
                 return Err(Error::SocketError(format!("{} | {}", e, e.kind())));
             }

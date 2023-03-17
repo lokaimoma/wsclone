@@ -15,7 +15,11 @@
       "all": false,
       "shell": {
         "all": false,
-        "open": true
+        "open": true,
+        "sidecar": true,
+        "scope": [
+            {"name": "../binaries/daemon", "sidecar": true}
+        ]
       }
     },
     "bundle": {
@@ -25,7 +29,7 @@
       "deb": {
         "depends": []
       },
-      "externalBin": [],
+      "externalBin": ["../binaries/daemon"],
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",
