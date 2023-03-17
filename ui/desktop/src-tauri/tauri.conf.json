@@ -18,7 +18,7 @@
         "open": true,
         "sidecar": true,
         "scope": [
-            {"name": "../binaries/daemon", "sidecar": true}
+            {"name": "../binaries/daemon", "sidecar": true, "args": true}
         ]
       }
     },

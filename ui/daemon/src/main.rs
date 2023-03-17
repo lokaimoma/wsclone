@@ -32,12 +32,10 @@ async fn main() {
         .init();
     let mut daemon_cli = DaemonCli::parse();
     if !daemon_cli.clones_dir.is_dir() {
-        tracing::error!(
-            msg = "Clones directory might not exist or you do not have permission to access it",
-            dir = daemon_cli.clones_dir.to_string_lossy().to_string()
-        );
-        eprintln!("Clones directory might not exist or you do not have permission to access it");
-        return;
+        if let Err(e) = tokio::fs::create_dir_all(&daemon_cli.clones_dir).await {
+            eprintln!("[ERROR] Failed to create clones directory : {e}");
+            return;
+        }
     }
     daemon_cli.clones_dir = match fs::canonicalize(&daemon_cli.clones_dir) {
         Ok(v) => v,
