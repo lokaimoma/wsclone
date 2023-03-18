@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 mod plugin;
+mod state;
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
