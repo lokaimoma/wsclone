@@ -7,7 +7,7 @@
     "withGlobalTauri": false
   },
   "package": {
-    "productName": "wsclone_ui",
+    "productName": "wsclone",
     "version": "0.0.0"
   },
   "tauri": {
