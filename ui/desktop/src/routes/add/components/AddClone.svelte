@@ -1,5 +1,7 @@
 <script lang="ts">
     import Psychic from "$lib/psychic";
+    import Alerts from "$lib/stores/Alert";
+    import { AlertIcon } from "$lib/types";
 
     let description: string;
     let title: string = "hello";
@@ -24,9 +26,9 @@
         processingReq = true;
         // build AddClone payload and invoke tauri command
         Psychic.clone_site().then(() => {
-            console.log("Hey back from rust!!");
+            Alerts.add({msg: "Hey back from rust!!", id: Symbol(1), icon: AlertIcon.DEFAULT});
         }).catch(e => {
-            console.error(`Error occured ${e}`);
+            Alerts.add({msg: `An error occured : ${e}`, id: Symbol(1), icon: AlertIcon.DEFAULT});
         });
     }
 </script>

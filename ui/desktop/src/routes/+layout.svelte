@@ -1,11 +1,14 @@
 <script lang="ts">
     import "../app.css";
     import Navbar from "$lib/components/common/Navbar.svelte";
+    import Alert from "$lib/components/common/Alert.svelte";
+    import Alerts from "$lib/stores/Alert";
 </script>
 
 <div class="pane">
     <Navbar />
     <slot />
+    <Alert alerts={$Alerts}/>
 </div>
 
 <style>
