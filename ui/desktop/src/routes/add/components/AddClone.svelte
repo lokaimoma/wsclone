@@ -1,7 +1,9 @@
 <script lang="ts">
+    import Psychic from "$lib/psychic";
+
     let description: string;
-    let title: string;
-    let url: URL;
+    let title: string = "hello";
+    let url: URL = new URL("https://hello.com");
     let maxLevel: number;
     let maxFileSize: number;
     let blackListUrls: string;
@@ -21,6 +23,11 @@
     function onProceedBtnClicked() {
         processingReq = true;
         // build AddClone payload and invoke tauri command
+        Psychic.clone_site().then(() => {
+            console.log("Hey back from rust!!");
+        }).catch(e => {
+            console.error(`Error occured ${e}`);
+        });
     }
 </script>
 
@@ -45,6 +52,7 @@
                     on:change={(e) => onUrlChange(e)}
                     required
                     placeholder="https://somedomain.com/"
+                    value={url? url.toString() : ""}
                 />
                 {#if urlError}
                     <p class="error">Invalid url</p>

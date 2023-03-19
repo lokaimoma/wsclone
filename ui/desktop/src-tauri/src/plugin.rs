@@ -7,7 +7,9 @@ pub struct WSClonePlugin<R: Runtime> {
 }
 
 #[tauri::command]
-fn handle_command<'a>(app_state: State<'a, AppState>) {}
+fn handle_command<'a>(_app_state: State<'a, AppState>) {
+    println!("Hello command received");
+}
 
 impl<R: Runtime> WSClonePlugin<R> {
     pub fn new() -> Self {
