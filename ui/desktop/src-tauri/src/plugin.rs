@@ -1,15 +1,16 @@
 use tauri::{plugin::Plugin, Invoke, Manager, Runtime, State};
 
 use crate::state::AppState;
+use ws_common::command::Command;
 
 pub struct WSClonePlugin<R: Runtime> {
     invoke_handler: Box<dyn Fn(Invoke<R>) + Send + Sync + 'static>,
 }
 
 #[tauri::command]
-fn handle_command<'a>(_app_state: State<'a, AppState>, json_payload: String) {
+fn handle_command<'a>(_app_state: State<'a, AppState>, json_payload: Command) {
     println!("Hello command received");
-    println!("{json_payload}");
+    println!("{:?}", json_payload);
 }
 
 impl<R: Runtime> WSClonePlugin<R> {

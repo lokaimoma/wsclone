@@ -1,7 +1,7 @@
 <script lang="ts">
     import Psychic from "$lib/psychic";
     import Alerts from "$lib/stores/Alert";
-    import { AlertIcon } from "$lib/types";
+    import { AlertIcon, type CloneProp } from "$lib/types";
 
     let description: string;
     let title: string = "";
@@ -25,12 +25,34 @@
     function onProceedBtnClicked() {
         processingReq = true;
         // build AddClone payload and invoke tauri command
-        Psychic.clone_site().then(() => {
-            Alerts.add({msg: "Hey back from rust!!", id: Symbol(1), icon: AlertIcon.DEFAULT});
-        }).catch(e => {
-            processingReq = false;
-            Alerts.add({msg: `An error occured : ${e}`, id: Symbol(1), icon: AlertIcon.DEFAULT});
-        });
+        const prop: CloneProp = {
+            link: url.toString(),
+            maxLevel,
+            maxStaticFileSize: maxFileSize,
+            progressUpdateInterval: 1500,
+            dirName: "",
+            sessionId: "",
+            abortOnDownloadError: false,
+            downloadStaticResourceWithUnknownSize: true,
+            blackListUrls: blackListUrls.split(',')
+        };
+        Psychic.clone_site(prop)
+            .then(() => {
+                Alerts.add({
+                    msg: "Hey back from rust!!",
+                    id: Symbol(1),
+                    icon: AlertIcon.DEFAULT,
+                });
+            })
+            .catch((e) => {
+                processingReq = false;
+                console.error(e)
+                Alerts.add({
+                    msg: `An error occured : ${e}`,
+                    id: Symbol(1),
+                    icon: AlertIcon.DEFAULT,
+                });
+            });
     }
 </script>
 
@@ -41,11 +63,20 @@
     <form class="form">
         <label>
             <span>Title</span>
-            <input disabled={processingReq} type="text" bind:value={title} required />
+            <input
+                disabled={processingReq}
+                type="text"
+                bind:value={title}
+                required
+            />
         </label>
         <label>
             <span>Description</span>
-            <textarea disabled={processingReq} rows="3" bind:value={description} />
+            <textarea
+                disabled={processingReq}
+                rows="3"
+                bind:value={description}
+            />
         </label>
         <label>
             <span>URL</span>
@@ -55,7 +86,7 @@
                     on:change={(e) => onUrlChange(e)}
                     required
                     placeholder="https://somedomain.com/"
-                    value={url? url.toString() : ""}
+                    value={url ? url.toString() : ""}
                 />
                 {#if urlError}
                     <p class="error">Invalid url</p>
@@ -87,7 +118,11 @@
         </label>
         <label>
             <span>Blacklist url/patterns</span>
-            <textarea placeholder="/css,https://google.com,/ok" rows="3" bind:value={blackListUrls} />
+            <textarea
+                placeholder="/css,https://google.com,/ok"
+                rows="3"
+                bind:value={blackListUrls}
+            />
         </label>
     </form>
     {#if !processingReq}

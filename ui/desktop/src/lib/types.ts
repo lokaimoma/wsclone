@@ -10,25 +10,25 @@ export enum AlertIcon {
     DEFAULT,
 }
 
-export type Command<F> = {
+export type Command = {
     type: CommandType,
-    props: F,
-    keep_alive: boolean | null
+    props: string,
+    keepAlive: boolean | null
 }
 
 export enum CommandType {
-    CLONE,
-    HEALTH_CHECK,
-    GET_CLONES,
-    ABORT_CLONE,
-    CLONE_STATUS,
+    CLONE = "CLONE",
+    HEALTH_CHECK = "HEALTH_CHECK",
+    GET_CLONES = "GET_CLONES",
+    ABORT_CLONE = "ABORT_CLONE",
+    CLONE_STATUS = "CLONE_STATUS",
 }
 
 export type CloneProp = {
     sessionId: string,
     link: string,
     dirName: string,
-    maxStaticFileSize: string,
+    maxStaticFileSize: number,
     downloadStaticResourceWithUnknownSize: boolean,
     progressUpdateInterval: number,
     maxLevel: number,
