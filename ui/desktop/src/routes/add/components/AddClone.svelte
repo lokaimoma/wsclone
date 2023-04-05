@@ -4,8 +4,8 @@
     import { AlertIcon } from "$lib/types";
 
     let description: string;
-    let title: string = "hello";
-    let url: URL = new URL("https://hello.com");
+    let title: string = "";
+    let url: URL;
     let maxLevel: number;
     let maxFileSize: number;
     let blackListUrls: string;
@@ -28,6 +28,7 @@
         Psychic.clone_site().then(() => {
             Alerts.add({msg: "Hey back from rust!!", id: Symbol(1), icon: AlertIcon.DEFAULT});
         }).catch(e => {
+            processingReq = false;
             Alerts.add({msg: `An error occured : ${e}`, id: Symbol(1), icon: AlertIcon.DEFAULT});
         });
     }
