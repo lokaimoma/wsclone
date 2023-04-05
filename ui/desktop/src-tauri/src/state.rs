@@ -23,7 +23,7 @@ impl AppState {
     #[cfg(target_family = "unix")]
     pub fn new() -> Result<Self, String> {
         let dirs = ProjectDirs::from("com", "koc", "wsclone")
-            .expect("Project directoes for wsclone not found");
+            .expect("Project directories for wsclone not found");
 
         let data_dir = dirs.data_dir().to_path_buf();
         if !data_dir.exists() {
