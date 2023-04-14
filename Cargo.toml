@@ -2,7 +2,4 @@
 members = [
     "libwsclone",
     "cli",
-    "ui/desktop/src-tauri",
-    "ui/daemon",
-    "ui/common"
 ]
