@@ -1,1 +1,1 @@
-wsclone is a (WIP) rust tool for making local copies of a website.
+wsclone is a (WIP) tool for making local copies of a website.
